@@ -6,12 +6,12 @@
 3. Keep it simple. Trust -> Function
 
 ## Personal goals
-1. Improve coding skills
+1. Improve coding skill
 2. Learn what it takes to built native android apps
 3. Learn how to build on / for Ethereum 
 
 ## Where are we now
-1. Can import wallets cretead on Metamask using the mnemonic phrase.
+1. Can import wallets cretead on Metamask using the mnemonic phrase. (Currently just connects to Polygon test net)
 2. Can get all tokens and balances for the wallet (provided we add the contract adresses in)
 3. Can store encrpyted phrases in the shared prefs to maintain wallet after closing app
 
