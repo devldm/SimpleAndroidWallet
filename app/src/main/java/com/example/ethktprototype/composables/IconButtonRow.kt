@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,19 +43,14 @@ fun MyColumn(icon: ImageVector, text: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            IconButton(
-                onClick = {
-                    // TODO: Handle button click
-                },
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
                 modifier = Modifier
                     .background(MaterialTheme.colorScheme.background)
                     .padding(5.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = text
-                )
-            }
+            )
+
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
