@@ -24,11 +24,12 @@ class MainActivity : ComponentActivity() {
 
         // Initialize the view model
         viewModel = ViewModelProvider(this).get(WalletViewModel::class.java)
+        viewModel.loadMnemonicFromPrefs(applicationContext)
 
         setContent {
             val navController = rememberNavController()
             val isWalletMnemonicInPrefs = viewModel.mnemonicLoaded.value
-            var startPoint = if (!isWalletMnemonicInPrefs) "mainScreen" else "tokenList"
+            val startPoint = if (!isWalletMnemonicInPrefs) "mainScreen" else "tokenList"
 
             EthKtPrototypeTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {

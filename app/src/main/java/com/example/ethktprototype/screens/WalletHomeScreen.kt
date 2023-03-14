@@ -1,13 +1,13 @@
 package com.example.ethktprototype.screens
 
+import NetworkDropdown
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.ethktprototype.Network
 import com.example.ethktprototype.WalletViewModel
 import com.example.ethktprototype.composables.Loading
 import com.example.ethktprototype.composables.MyRow
@@ -26,9 +27,17 @@ import java.math.BigDecimal
 fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel) {
     val walletAddress = viewModel.walletAddress.value // Replace with the actual wallet address
     val context = LocalContext.current // get the Context object from the LocalContext
-
+    val networks = remember { Network.values().toList() }
+    val selectedNetwork = remember { mutableStateOf(viewModel.selectedNetwork.value) }
     val tokensState = viewModel.getTokens(walletAddress!!, context)
     val tokens by tokensState.observeAsState(emptyList())
+
+    Log.d("network", "selectedNetwork: ${selectedNetwork.value}")
+
+    LaunchedEffect(viewModel.selectedNetwork.value) {
+    Log.d("network", "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
+        viewModel.getTokens(walletAddress, context)
+    }
 
 
     Log.d("TokenListScreen", "Tokens size: ${tokens.size}")
@@ -57,9 +66,20 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
+        item{
+
+            NetworkDropdown(
+                networks = networks,
+                selectedNetwork = viewModel.selectedNetwork,
+                updateSelectedNetwork = { viewModel.updateSelectedNetwork(it) }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+        }
+
         item {
             MyRow()
             Spacer(modifier = Modifier.height(16.dp))

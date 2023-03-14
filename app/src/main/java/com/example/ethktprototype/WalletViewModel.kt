@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
@@ -11,14 +12,14 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.liveData
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.web3j.crypto.Bip32ECKeyPair
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.MnemonicUtils
 import org.web3j.crypto.WalletUtils
-import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
-import org.web3j.protocol.http.HttpService
 import org.web3j.tx.gas.DefaultGasProvider
 import java.io.IOException
 import java.math.BigDecimal
@@ -39,72 +40,82 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     val watchlist: LiveData<List<String>>
         get() = _watchlist
 
+    private val _selectedNetwork = mutableStateOf(Network.MUMBAI_TESTNET)
+    val selectedNetwork: MutableState<Network> = _selectedNetwork
+
     init {
         // Load the wallet address from SharedPreferences when the ViewModel is created
         _walletAddress.value = sharedPreferences.getString(walletAddressKey, "")
     }
 
+    fun updateSelectedNetwork(network: Network) {
+        Log.d("network", "updating _selectedNetwork to: $network")
+        _selectedNetwork.value = network
+    }
+    // Function to load the mnemonic from SharedPreferences on startup
+    fun loadMnemonicFromPrefs(context: Context) {
+        val prefs = context.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
+        val storedMnemonic = prefs.getString("encrypted_mnemonic", null)
+        mnemonicLoaded.value = storedMnemonic != null
+    }
+
     fun getTokens(walletAddress: String, context: Context): LiveData<List<TokenBalance>> =
         liveData {
-            val web3j = Web3j.build(HttpService("https://matic-mumbai.chainstacklabs.com/"))
+            val web3j = Web3jService.build(_selectedNetwork.value)
 
             // Get the decrypted mnemonic from the Keystore
             val mnemonic = getMnemonic(context)
             var credentials: Credentials? = null
-            if (mnemonic.isNullOrEmpty()) {
-                null
-                Log.d("viewModel", "its empty")
-            } else {
+            if (!mnemonic.isNullOrEmpty()) {
                 Log.d("viewModel", "loading credentials with mnemonic $mnemonic")
                 credentials = WalletUtils.loadBip39Credentials(null, mnemonic)
             }
-            // Create Credentials object using the mnemonic
-            val tokens = withContext(Dispatchers.IO) {
-                val contractAddresses = getTokenContractAddresses()
-                Log.d("TokenListScreen", "Contract addresses: $contractAddresses")
-                val balances = contractAddresses.mapNotNull { address ->
-                    try {
-                        Log.d("TokenListScreen", "Creating contract for address: $address")
-                        val contract =
-                            ERC20.load(address, web3j, credentials!!, DefaultGasProvider())
-                        Log.d(
-                            "TokenListScreen",
-                            "Contract created successfully for address: $address"
-                        )
 
-                        Log.d(
-                            "TokenListScreen",
-                            "Contract created successfully for address: $address"
-                        )
-                        val balance = contract.balanceOf(walletAddress)
-                        Log.d(
-                            "TokenListScreen",
-                            "Retrieved balance successfully for address: $address"
-                        )
-                        val name = contract.name()
-                        val symbol = contract.symbol()
-                        TokenBalance(address, balance, name, symbol)
-                    } catch (e: Exception) {
-                        if (e.message?.contains("Invalid BigInteger") == true) {
-                            // Handle "Invalid BigInteger" error
-                            Log.e("Tokens", "Invalid BigInteger for $address: ${e.message}")
-                            null
-                        } else {
-                            // Log other errors and continue processing
-                            Log.e(
-                                "Tokens",
-                                "Error fetching token balance for $address: ${e.message}"
+            // Create Credentials object using the mnemonic
+            val contractAddresses = getTokenContractAddresses()
+            Log.d("TokenListScreen", "Contract addresses: $contractAddresses")
+            val balances = withContext(Dispatchers.IO) {
+                val tokenBalanceDeferred = contractAddresses.map { address ->
+                    async {
+                        try {
+                            Log.d("TokenListScreen", "Creating contract for address: $address")
+                            val contract =
+                                ERC20.load(address, web3j, credentials!!, DefaultGasProvider())
+                            Log.d(
+                                "TokenListScreen",
+                                "Contract created successfully for address: $address"
                             )
-                            null
+
+                            val balance = contract.balanceOf(walletAddress)
+                            Log.d(
+                                "TokenListScreen",
+                                "Retrieved balance successfully for address: $address"
+                            )
+                            val name = contract.name()
+                            val symbol = contract.symbol()
+                            TokenBalance(address, balance, name, symbol)
+                        } catch (e: Exception) {
+                            if (e.message?.contains("Invalid BigInteger") == true) {
+                                // Handle "Invalid BigInteger" error
+                                Log.e("Tokens", "Invalid BigInteger for $address: ${e.message}")
+                                null
+                            } else {
+                                // Log other errors and continue processing
+                                Log.e(
+                                    "Tokens",
+                                    "Error fetching token balance for $address: ${e.message}"
+                                )
+                                null
+                            }
                         }
                     }
                 }
-                balances
+                tokenBalanceDeferred.awaitAll().filterNotNull()
             }
-
-            emit(tokens)
-            Log.d("Tokens", "Emitted tokens: $tokens")
+            emit(balances)
+            Log.d("Tokens", "Emitted tokens: $balances")
         }
+
 
     private fun getTokenContractAddresses(): List<String> {
         return listOf(
@@ -175,9 +186,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun getBalance(address: String): String? {
-        println(address)
-        val web3j =
-            Web3j.build(HttpService("https://matic-mumbai.chainstacklabs.com/"))
+        val web3j = Web3jService.build(_selectedNetwork.value)
 
         return try {
             Log.d("WalletViewModel", "the address is $address")
@@ -191,7 +200,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 .toPlainString()
             balanceInEth
         } catch (e: IOException) {
-            Log.d("WalletViewModel", "getBalance faile $e")
+            Log.d("WalletViewModel", "getBalance failed $e")
 
             null
         }
