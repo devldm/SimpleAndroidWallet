@@ -1,6 +1,7 @@
 package com.example.ethktprototype.screens
 
 import NetworkDropdown
+import TransactionViewModel
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,17 +21,46 @@ import com.example.ethktprototype.Network
 import com.example.ethktprototype.WalletViewModel
 import com.example.ethktprototype.composables.Loading
 import com.example.ethktprototype.composables.MyRow
+import com.example.ethktprototype.composables.PayDialog
+import com.example.ethktprototype.composables.WalletAddressModal
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel) {
+fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel, transactionViewModel: TransactionViewModel) {
     val walletAddress = viewModel.walletAddress.value // Replace with the actual wallet address
     val context = LocalContext.current // get the Context object from the LocalContext
     val networks = remember { Network.values().toList() }
     val selectedNetwork = remember { mutableStateOf(viewModel.selectedNetwork.value) }
     val tokensState = viewModel.getTokens(walletAddress!!, context)
     val tokens by tokensState.observeAsState(emptyList())
+    var showPayDialog by remember { mutableStateOf(false) }
+    var showWalletModal by remember { mutableStateOf(false) }
+
+
+    fun onPayConfirmed(amount: Double) {
+        val mnemonic = viewModel.getMnemonic(context)
+
+        if (!mnemonic.isNullOrEmpty()) {
+            val credentials = viewModel.loadBip44Credentials(mnemonic)
+            Log.d("send", "credentials: ${credentials.address}")
+
+            credentials?.let {
+                val testAddress = "0x2360BF04Ba25fFeDDA24A519a2283D78FD84f6a6"
+                // wrap the sendMatic call in a coroutine
+                CoroutineScope(Dispatchers.Default).launch {
+                    transactionViewModel.sendMatic(credentials, testAddress, BigDecimal.valueOf(0.000001))
+                }
+                showPayDialog = false
+            }
+        }
+    }
+
+
+
 
     Log.d("network", "selectedNetwork: ${selectedNetwork.value}")
 
@@ -81,8 +111,22 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
         }
 
         item {
-            MyRow()
+            MyRow(showPayDialog, setShowPayDialog = { showPayDialog = it }, showWalletModal, setShowWalletModal = { showWalletModal = it})
             Spacer(modifier = Modifier.height(16.dp))
+            
+            if(showWalletModal) {
+                WalletAddressModal(walletAddress = walletAddress, onDismiss = { showWalletModal = false })
+            }
+
+            // show the pay dialog if the state variable is true
+            if (showPayDialog) {
+                PayDialog(
+                    onDismiss = { showPayDialog = false },
+                    onPay = {address, amount -> onPayConfirmed(amount.toDouble())},
+                    selectedNetwork = selectedNetwork.value
+
+                )
+            }
 
         }
         if(tokens.isEmpty()){

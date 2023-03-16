@@ -1,5 +1,6 @@
 package com.example.ethktprototype
 
+import TransactionViewModel
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,12 +19,14 @@ import java.math.BigInteger
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: WalletViewModel
+    private lateinit var transactionViewModel: TransactionViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Initialize the view model
         viewModel = ViewModelProvider(this).get(WalletViewModel::class.java)
+        transactionViewModel = ViewModelProvider(this).get(TransactionViewModel::class.java)
         viewModel.loadMnemonicFromPrefs(applicationContext)
 
         setContent {
@@ -41,7 +44,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("tokenList") {
-                            TokenListScreen(navController, viewModel)
+                            TokenListScreen(navController, viewModel, transactionViewModel)
                         }
                     }
                 }

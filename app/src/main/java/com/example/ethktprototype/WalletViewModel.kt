@@ -36,9 +36,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     val walletAddress: LiveData<String>
         get() = _walletAddress
 
-    private val _watchlist = MutableLiveData<List<String>>(emptyList())
-    val watchlist: LiveData<List<String>>
-        get() = _watchlist
 
     private val _selectedNetwork = mutableStateOf(Network.MUMBAI_TESTNET)
     val selectedNetwork: MutableState<Network> = _selectedNetwork
@@ -158,17 +155,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _walletAddress.value = walletAddress
     }
 
-    // Add a function to update the watchlist
-    fun addToWatchlist(address: String) {
-        _watchlist.value = _watchlist.value?.plus(address)
-    }
-
-    // Add a function to update the watchlist
-    fun removeFromWatchlist(address: String) {
-        _watchlist.value = _watchlist.value?.minus(address)
-    }
-
-
     fun getWalletBalance(walletAddress: String): LiveData<String> = liveData {
         Log.d("WalletViewModel", "Getting balance for address: $walletAddress")
         val balance = withContext(Dispatchers.IO) {
@@ -206,3 +192,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 }
+
+
+
+//    private val _watchlist = MutableLiveData<List<String>>(emptyList())
+//    val watchlist: LiveData<List<String>>
+//        get() = _watchlist
+
+//    // Add a function to update the watchlist
+//    fun addToWatchlist(address: String) {
+//        _watchlist.value = _watchlist.value?.plus(address)
+//    }
+//
+//    // Add a function to update the watchlist
+//    fun removeFromWatchlist(address: String) {
+//        _watchlist.value = _watchlist.value?.minus(address)
+//    }
