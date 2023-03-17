@@ -19,10 +19,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.ethktprototype.Network
 import com.example.ethktprototype.WalletViewModel
-import com.example.ethktprototype.composables.Loading
-import com.example.ethktprototype.composables.MyRow
-import com.example.ethktprototype.composables.PayDialog
-import com.example.ethktprototype.composables.WalletAddressModal
+import com.example.ethktprototype.composables.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -39,10 +36,21 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
     val tokens by tokensState.observeAsState(emptyList())
     var showPayDialog by remember { mutableStateOf(false) }
     var showWalletModal by remember { mutableStateOf(false) }
+    val transactionHash = remember { mutableStateOf("") }
+    var showSuccessModal by remember { mutableStateOf(false)}
+    var toAddress by remember {
+        mutableStateOf("")
+    }
+    var sentAmount by remember {
+        mutableStateOf(0.0)
+    }
 
 
-    fun onPayConfirmed(amount: Double) {
+    fun onPayConfirmed(address: String, amount: Double) {
         val mnemonic = viewModel.getMnemonic(context)
+        toAddress = address
+        sentAmount = amount
+
 
         if (!mnemonic.isNullOrEmpty()) {
             val credentials = viewModel.loadBip44Credentials(mnemonic)
@@ -52,7 +60,10 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                 val testAddress = "0x2360BF04Ba25fFeDDA24A519a2283D78FD84f6a6"
                 // wrap the sendMatic call in a coroutine
                 CoroutineScope(Dispatchers.Default).launch {
-                    transactionViewModel.sendMatic(credentials, testAddress, BigDecimal.valueOf(amount))
+                    val hash = transactionViewModel.sendMatic(credentials, testAddress, BigDecimal.valueOf(amount))
+                    if (!hash.isNullOrEmpty()) {
+                        showSuccessModal = true
+                    }
                 }
                 showPayDialog = false
             }
@@ -118,11 +129,15 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                 WalletAddressModal(walletAddress = walletAddress, onDismiss = { showWalletModal = false })
             }
 
+            if(showSuccessModal) {
+                SuccessDialogModal(value = sentAmount.toString(), address = toAddress, onDismiss = {showSuccessModal = false})
+            }
+
             // show the pay dialog if the state variable is true
             if (showPayDialog) {
                 PayDialog(
                     onDismiss = { showPayDialog = false },
-                    onPay = {address, amount -> onPayConfirmed(amount.toDouble())},
+                    onPay = {address, amount -> onPayConfirmed(address,amount.toDouble())},
                     selectedNetwork = selectedNetwork.value
 
                 )
