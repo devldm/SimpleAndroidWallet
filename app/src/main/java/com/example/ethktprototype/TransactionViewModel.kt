@@ -6,13 +6,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.bouncycastle.util.encoders.Hex
 import org.json.JSONObject
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.TransactionEncoder
 import org.web3j.protocol.core.DefaultBlockParameterName
+import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.utils.Convert
+import org.web3j.utils.Numeric
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -45,33 +46,27 @@ class TransactionViewModel : ViewModel() {
         return withContext(Dispatchers.IO) {
             try {
                 val nonce: BigInteger = web3j.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
-                    .send().transactionCount // subtract a smaller value from the current nonce
+                    .send().transactionCount
 
-//                val gasPrice = BigInteger.valueOf(80)
-//                val gasLimit = BigInteger.valueOf(21000)
-                val gasPrice = BigInteger.valueOf(50000)// 10 Gwei in wei
-                val gasLimit = BigInteger.valueOf(50000000) // standard gas limit for ETH transfer on Ethereum mainnet
+                val a = web3j.ethGasPrice().send().gasPrice
+                val gasMax = DefaultGasProvider().gasLimit
 
 
                 val chainIdLong: Long = 80001
 
-                // Create a new instance of `org.web3j.crypto.RawTransaction` with the constructor that takes the
-                // following arguments: nonce, gasPrice, gasLimit, toAddress, value, data. In this case, we don't
-                // need to include any data, so we can pass null.
                 val rawTransaction = RawTransaction.createEtherTransaction(
                     nonce,
-                    gasLimit,
+                    a,
+                    gasMax,
                     toAddress,
-                    Convert.toWei(value, Convert.Unit.WEI).toBigInteger(),
-                    null,
-                    null
+                    Convert.toWei(value, Convert.Unit.ETHER).toBigInteger()
                 )
 
                 // Sign the transaction using the credentials and chain ID.
                 val signedMessage = TransactionEncoder.signMessage(rawTransaction, chainIdLong, credentials)
-                val hexValue = Hex.toHexString(signedMessage)
+                val hexValue = Numeric.toHexString(signedMessage)
                 // Send the signed transaction to the network.
-                val transactionResponse = web3j.ethSendRawTransaction("0x${Hex.toHexString(signedMessage)}").send()
+                val transactionResponse = web3j.ethSendRawTransaction(hexValue).sendAsync().get()
 
                 if (transactionResponse.hasError()) {
                     Log.d("send", "transaction failed: ${transactionResponse.error.message}")

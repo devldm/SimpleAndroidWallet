@@ -52,7 +52,7 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                 val testAddress = "0x2360BF04Ba25fFeDDA24A519a2283D78FD84f6a6"
                 // wrap the sendMatic call in a coroutine
                 CoroutineScope(Dispatchers.Default).launch {
-                    transactionViewModel.sendMatic(credentials, testAddress, BigDecimal.valueOf(0.000001))
+                    transactionViewModel.sendMatic(credentials, testAddress, BigDecimal.valueOf(amount))
                 }
                 showPayDialog = false
             }
