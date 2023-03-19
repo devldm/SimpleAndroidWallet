@@ -14,7 +14,6 @@ import com.example.ethktprototype.screens.MyMainScreen
 import com.example.ethktprototype.screens.TokenListScreen
 import com.example.ethktprototype.ui.theme.EthKtPrototypeTheme
 import org.web3j.crypto.MnemonicUtils
-import java.math.BigInteger
 
 
 class MainActivity : ComponentActivity() {
@@ -44,7 +43,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("tokenList") {
-                            TokenListScreen(navController, viewModel, transactionViewModel)
+                            TokenListScreen(navController, viewModel, transactionViewModel, application)
                         }
                     }
                 }
@@ -60,13 +59,6 @@ fun isValidMnemonic(mnemonic: String): Boolean {
         false
     }
 }
-
-data class TokenBalance(
-    val contractAddress: String,
-    val balance: BigInteger,
-    val name: String,
-    val symbol: String
-)
 
 
 

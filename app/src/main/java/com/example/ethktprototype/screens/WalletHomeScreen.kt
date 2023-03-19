@@ -2,6 +2,7 @@ package com.example.ethktprototype.screens
 
 import NetworkDropdown
 import TransactionViewModel
+import android.app.Application
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,17 +28,23 @@ import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel, transactionViewModel: TransactionViewModel) {
+fun TokenListScreen(
+    navController: NavHostController,
+    viewModel: WalletViewModel,
+    transactionViewModel: TransactionViewModel,
+    application: Application
+) {
     val walletAddress = viewModel.walletAddress.value // Replace with the actual wallet address
     val context = LocalContext.current // get the Context object from the LocalContext
     val networks = remember { Network.values().toList() }
-    val selectedNetwork = remember { mutableStateOf(viewModel.selectedNetwork.value) }
-    val tokensState = viewModel.getTokens(walletAddress!!, context)
+    val contractAddresses = viewModel.getTokenContractAddresses()
+    val tokensState = viewModel.getTokens(walletAddress!!, contractAddresses, context, application, viewModel)
     val tokens by tokensState.observeAsState(emptyList())
     var showPayDialog by remember { mutableStateOf(false) }
     var showWalletModal by remember { mutableStateOf(false) }
-    val transactionHash = remember { mutableStateOf("") }
-    var showSuccessModal by remember { mutableStateOf(false)}
+    var showSuccessModal by remember { mutableStateOf(false) }
+
+
     var toAddress by remember {
         mutableStateOf("")
     }
@@ -56,11 +63,12 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
             val credentials = viewModel.loadBip44Credentials(mnemonic)
             Log.d("send", "credentials: ${credentials.address}")
 
-            credentials?.let {
-                val testAddress = "0x2360BF04Ba25fFeDDA24A519a2283D78FD84f6a6"
+            credentials.let {
                 // wrap the sendMatic call in a coroutine
                 CoroutineScope(Dispatchers.Default).launch {
-                    val hash = transactionViewModel.sendMatic(credentials, testAddress, BigDecimal.valueOf(amount))
+                    val hash = transactionViewModel.sendMatic(
+                        credentials, address, BigDecimal.valueOf(amount)
+                    )
                     if (!hash.isNullOrEmpty()) {
                         showSuccessModal = true
                     }
@@ -73,25 +81,25 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
 
 
 
-    Log.d("network", "selectedNetwork: ${selectedNetwork.value}")
+    Log.d("network", "selectedNetwork: ${viewModel.selectedNetwork.value}")
 
     LaunchedEffect(viewModel.selectedNetwork.value) {
-    Log.d("network", "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
-        viewModel.getTokens(walletAddress, context)
+        Log.d("network", "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
+        viewModel.getTokens(walletAddress, contractAddresses, context, application, viewModel)
     }
 
 
     Log.d("TokenListScreen", "Tokens size: ${tokens.size}")
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().fillMaxHeight(),
         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 16.dp)
     ) {
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(16.dp).fillMaxHeight()
             ) {
                 Text(
                     text = "Wallet Address",
@@ -110,48 +118,57 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-        item{
+        item {
 
-            NetworkDropdown(
-                networks = networks,
+            NetworkDropdown(networks = networks,
                 selectedNetwork = viewModel.selectedNetwork,
-                updateSelectedNetwork = { viewModel.updateSelectedNetwork(it) }
-            )
+                updateSelectedNetwork = { viewModel.updateSelectedNetwork(it) })
             Spacer(modifier = Modifier.height(8.dp))
 
         }
 
         item {
-            MyRow(showPayDialog, setShowPayDialog = { showPayDialog = it }, showWalletModal, setShowWalletModal = { showWalletModal = it})
+            MyRow(showPayDialog,
+                setShowPayDialog = { showPayDialog = it },
+                showWalletModal,
+                setShowWalletModal = { showWalletModal = it })
             Spacer(modifier = Modifier.height(16.dp))
-            
-            if(showWalletModal) {
-                WalletAddressModal(walletAddress = walletAddress, onDismiss = { showWalletModal = false })
+
+            if (showWalletModal) {
+                WalletAddressModal(walletAddress = walletAddress,
+                    onDismiss = { showWalletModal = false })
             }
 
-            if(showSuccessModal) {
-                SuccessDialogModal(value = sentAmount.toString(), address = toAddress, onDismiss = {showSuccessModal = false})
+            if (showSuccessModal) {
+                SuccessDialogModal(value = sentAmount.toString(),
+                    address = toAddress,
+                    onDismiss = { showSuccessModal = false })
             }
 
             // show the pay dialog if the state variable is true
             if (showPayDialog) {
-                PayDialog(
-                    onDismiss = { showPayDialog = false },
-                    onPay = {address, amount -> onPayConfirmed(address,amount.toDouble())},
-                    selectedNetwork = selectedNetwork.value
+                PayDialog(onDismiss = { showPayDialog = false },
+                    onPay = { address, amount -> onPayConfirmed(address, amount.toDouble()) },
+                    selectedNetwork = viewModel.selectedNetwork.value
 
                 )
             }
 
         }
-        if(tokens.isEmpty()){
-            item{
+        if (viewModel.loading.value) {
+            item {
                 Loading()
             }
+        } else if (!viewModel.loading.value && tokens.isEmpty()) {
+            item {
+                Column(modifier = Modifier.fillMaxSize().fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally,) {
+                    Text("No tokens found for this wallet")
+                }
 
-        }
-        else {
+            }
+        } else {
             items(tokens.size) { token ->
+                Log.d("tokens UI", "$tokens")
                 val t = tokens[token]
                 val balanceInEth = t.balance.toBigDecimal().divide(BigDecimal.TEN.pow(18))
                 val formatBalance = balanceInEth?.let { String.format("%.2f", it) } ?: "N/A"
@@ -170,19 +187,20 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                             .fillMaxWidth()
                             .padding(vertical = 2.dp)
                     ) {
-                        Column(modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .clickable(onClick = {
-                                // TODO: Handle click on token
-                            })
-                        )
-                        {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                                .clickable(onClick = {
+                                    // TODO: Handle click on token
+                                })
+                        ) {
 
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    t.symbol, style = MaterialTheme.typography.bodyMedium,
+                                    t.symbol,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                                 )
 
@@ -204,7 +222,5 @@ fun TokenListScreen(navController: NavHostController, viewModel: WalletViewModel
                 }
             }
         }
-
-
     }
 }
