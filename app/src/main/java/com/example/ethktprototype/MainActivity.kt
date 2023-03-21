@@ -24,8 +24,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Initialize the view model
-        viewModel = ViewModelProvider(this).get(WalletViewModel::class.java)
-        transactionViewModel = ViewModelProvider(this).get(TransactionViewModel::class.java)
+        viewModel = ViewModelProvider(this)[WalletViewModel::class.java]
+        transactionViewModel = ViewModelProvider(this)[TransactionViewModel::class.java]
         viewModel.loadMnemonicFromPrefs(applicationContext)
 
         setContent {

@@ -36,7 +36,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val currentNetwork = walletSharePrefs.getString("SELECTED_NETWORK_NAME", null)
     private val currentNetworkBalances = currentNetwork?.let { getUserBalances(application, it) }
 
-    private val _selectedToken = mutableStateOf<TokenBalance?>(currentNetworkBalances?.get(0))
+    private val _selectedToken = mutableStateOf(currentNetworkBalances?.firstOrNull() ?: null)
     val selectedToken: State<TokenBalance?> = _selectedToken
 
     fun updateSelectedToken(token: TokenBalance?) {
