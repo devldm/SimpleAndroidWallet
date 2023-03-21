@@ -38,7 +38,7 @@ fun TokenListScreen(
     val context = LocalContext.current // get the Context object from the LocalContext
     val networks = remember { Network.values().toList() }
     val contractAddresses = viewModel.getTokenContractAddresses()
-    val tokensState = viewModel.getTokens(walletAddress!!, contractAddresses, context, application, viewModel)
+    val tokensState = viewModel.getTokens(walletAddress!!, contractAddresses, context, application)
     val tokens by tokensState.observeAsState(emptyList())
     var showPayDialog by remember { mutableStateOf(false) }
     var showWalletModal by remember { mutableStateOf(false) }
@@ -53,7 +53,7 @@ fun TokenListScreen(
     }
 
 
-    fun onPayConfirmed(address: String, amount: Double) {
+    fun onPayConfirmed(address: String, amount: Double, contractAddress: String) {
         val mnemonic = viewModel.getMnemonic(context)
         toAddress = address
         sentAmount = amount
@@ -64,10 +64,10 @@ fun TokenListScreen(
             Log.d("send", "credentials: ${credentials.address}")
 
             credentials.let {
-                // wrap the sendMatic call in a coroutine
+                // wrap the sendToken call in a coroutine
                 CoroutineScope(Dispatchers.Default).launch {
-                    val hash = transactionViewModel.sendMatic(
-                        credentials, address, BigDecimal.valueOf(amount)
+                    val hash = transactionViewModel.sendTokens(
+                        credentials, contractAddress, address, BigDecimal.valueOf(0.5)
                     )
                     if (!hash.isNullOrEmpty()) {
                         showSuccessModal = true
@@ -85,7 +85,7 @@ fun TokenListScreen(
 
     LaunchedEffect(viewModel.selectedNetwork.value) {
         Log.d("network", "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
-        viewModel.getTokens(walletAddress, contractAddresses, context, application, viewModel)
+        viewModel.getTokens(walletAddress, contractAddresses, context, application)
     }
 
 
@@ -148,9 +148,10 @@ fun TokenListScreen(
             // show the pay dialog if the state variable is true
             if (showPayDialog) {
                 PayDialog(onDismiss = { showPayDialog = false },
-                    onPay = { address, amount -> onPayConfirmed(address, amount.toDouble()) },
-                    selectedNetwork = viewModel.selectedNetwork.value
-
+                    onPay = { address, amount, contractAddress -> onPayConfirmed(address, amount.toDouble(), contractAddress) },
+                    selectedNetwork = viewModel.selectedNetwork.value,
+                    tokens = tokens,
+                    transactionViewModel = transactionViewModel
                 )
             }
 

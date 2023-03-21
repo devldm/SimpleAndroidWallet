@@ -1,6 +1,8 @@
 package com.example.ethktprototype
 
 import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import com.google.common.reflect.TypeToken
 import kotlinx.serialization.Contextual
@@ -17,10 +19,25 @@ data class TokenBalance(
     val symbol: String
 )
 
-fun cacheUserBalance(tokenBalance: TokenBalance, application: Application, selectedNetwork: String, viewModel: WalletViewModel) {
-    val sharedPreferences = viewModel.getBalancesSharedPreferences(application)
-    Log.d("cache", "cached User balance $tokenBalance with key ${viewModel.getTokenBalancesSharedPreferencesKey(selectedNetwork)}")
-    val existingBalances = getUserBalances(application, selectedNetwork, viewModel)
+fun getBalancesSharedPreferences(application: Application): SharedPreferences {
+    return application.getSharedPreferences("Balances", Context.MODE_PRIVATE)
+}
+
+fun getCacheExpirationTime(sharedPreferences: SharedPreferences): Long {
+    val CACHE_EXPIRATION_INTERVAL = 300 // 5 minutes in seconds
+    val CACHE_EXPIRATION_TIME_KEY = "CACHE_EXPIRATION_TIME"
+    return sharedPreferences.getLong(CACHE_EXPIRATION_TIME_KEY, 0L) + CACHE_EXPIRATION_INTERVAL
+}
+
+fun getTokenBalancesSharedPreferencesKey(selectedNetwork: String): String {
+    val TOKEN_BALANCES_KEY = "TOKEN_BALANCES"
+    return "${selectedNetwork}_$TOKEN_BALANCES_KEY"
+}
+
+fun cacheUserBalance(tokenBalance: TokenBalance, application: Application, selectedNetwork: String) {
+    val sharedPreferences = getBalancesSharedPreferences(application)
+    Log.d("cache", "cached User balance $tokenBalance with key ${getTokenBalancesSharedPreferencesKey(selectedNetwork)}")
+    val existingBalances = getUserBalances(application, selectedNetwork)
 
     Log.d("cache", "exisitingBalances: $existingBalances")
     val newBalances = existingBalances.toMutableList()
@@ -30,15 +47,15 @@ fun cacheUserBalance(tokenBalance: TokenBalance, application: Application, selec
     val json = Json.encodeToString(newBalances)
     Log.d("cache", "newBalances: $newBalances")
 
-    sharedPreferences.edit().putString(viewModel.getTokenBalancesSharedPreferencesKey(selectedNetwork), json).apply()
+    sharedPreferences.edit().putString(getTokenBalancesSharedPreferencesKey(selectedNetwork), json).apply()
 }
 
-fun getUserBalances(application: Application, selectedNetwork: String, viewModel: WalletViewModel): List<TokenBalance> {
-    val sharedPreferences = viewModel.getBalancesSharedPreferences(application)
-    val cacheExpirationTime = viewModel.getCacheExpirationTime(sharedPreferences)
+fun getUserBalances(application: Application, selectedNetwork: String): List<TokenBalance> {
+    val sharedPreferences = getBalancesSharedPreferences(application)
+    val cacheExpirationTime = getCacheExpirationTime(sharedPreferences)
     val currentTime = System.currentTimeMillis() / 1000
 
-    val json = sharedPreferences.getString(viewModel.getTokenBalancesSharedPreferencesKey(selectedNetwork), null)
+    val json = sharedPreferences.getString(getTokenBalancesSharedPreferencesKey(selectedNetwork), null)
     Log.d("ggub", "$json")
 
     return if (json != null && cacheExpirationTime > currentTime) {

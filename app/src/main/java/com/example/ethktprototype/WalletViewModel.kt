@@ -1,19 +1,21 @@
 package com.example.ethktprototype
 
+import ERC20
 import android.app.Application
 import android.content.Context
-import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.util.Log
-import androidx.compose.runtime.*
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.liveData
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.web3j.crypto.Bip32ECKeyPair
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.MnemonicUtils
@@ -41,6 +43,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _selectedNetwork = mutableStateOf(Network.MUMBAI_TESTNET)
     val selectedNetwork: MutableState<Network> = _selectedNetwork
 
+    val selectedNetworkPreference = sharedPreferences.edit().putString("SELECTED_NETWORK_NAME", _selectedNetwork.value.displayName).apply()
+
+
+
     val loading = mutableStateOf(true)
 
     init {
@@ -51,6 +57,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun updateSelectedNetwork(network: Network) {
         Log.d("network", "updating _selectedNetwork to: $network")
         _selectedNetwork.value = network
+        sharedPreferences.edit().putString("SELECTED_NETWORK_NAME", network.displayName).apply()
+
     }
 
     // Function to load the mnemonic from SharedPreferences on startup
@@ -60,27 +68,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         mnemonicLoaded.value = storedMnemonic != null
     }
 
-    fun getBalancesSharedPreferences(application: Application): SharedPreferences {
-        return application.getSharedPreferences("Balances", Context.MODE_PRIVATE)
-    }
 
-    fun getCacheExpirationTime(sharedPreferences: SharedPreferences): Long {
-        val CACHE_EXPIRATION_INTERVAL = 300 // 5 minutes in seconds
-        val CACHE_EXPIRATION_TIME_KEY = "CACHE_EXPIRATION_TIME"
-        return sharedPreferences.getLong(CACHE_EXPIRATION_TIME_KEY, 0L) + CACHE_EXPIRATION_INTERVAL
-    }
-
-    fun getTokenBalancesSharedPreferencesKey(selectedNetwork: String): String {
-        val TOKEN_BALANCES_KEY = "TOKEN_BALANCES"
-        return "${selectedNetwork}_$TOKEN_BALANCES_KEY"
-    }
 
     fun getTokens(
         walletAddress: String,
         contractAddresses: List<String>,
         context: Context,
         application: Application,
-        viewModel: WalletViewModel
     ): LiveData<List<TokenBalance>> = liveData {
 
         // Use flag to indicate whether network calls have already been made or not
@@ -111,7 +105,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         tokenBalance,
                         application,
                         selectedNetwork = _selectedNetwork.value.displayName,
-                        viewModel = viewModel
                     )
                 }
                 Log.d("TBalances", "$tokenBalances")
@@ -123,7 +116,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         loading.value = false
         Log.d("Tokens", "Emitted tokens: $balances")
         // Update the cache expiration time
-        val sharedPreferences = viewModel.getBalancesSharedPreferences(application)
+        val sharedPreferences = getBalancesSharedPreferences(application)
         sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime).apply()
 
         // Set networkCallsMade to false after a certain delay
@@ -221,13 +214,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _walletAddress.value = walletAddress
     }
 
-    fun getWalletBalance(walletAddress: String): LiveData<String> = liveData {
-        Log.d("WalletViewModel", "Getting balance for address: $walletAddress")
-        val balance = withContext(Dispatchers.IO) {
-            getBalance(walletAddress)
-        }
-        emit(balance ?: "Balance not Found")
-    }
+//    fun getWalletBalance(walletAddress: String): LiveData<String> = liveData {
+//        Log.d("WalletViewModel", "Getting balance for address: $walletAddress")
+//        val balance = withContext(Dispatchers.IO) {
+//            getBalance(walletAddress)
+//        }
+//        emit(balance ?: "Balance not Found")
+//    }
 
     fun loadBip44Credentials(mnemonic: String): Credentials {
         val seed = MnemonicUtils.generateSeed(mnemonic, "")

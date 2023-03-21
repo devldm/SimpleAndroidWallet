@@ -74,23 +74,6 @@ class ERC20(
 
         return response.value
     }
-
-//    fun iconUrl(): String? {
-//        val function = Function(
-//            "iconUrl",
-//            emptyList(),
-//            listOf(object : TypeReference<Utf8String?>() {})
-//        )
-//        return try {
-//            val response = executeCallSingleValueReturn<Utf8String?>(function)
-//            response.value
-//        } catch (e: Exception) {
-//            Log.e("ERC20", "Error fetching iconUrl: ${e.message}")
-//            null
-//        }
-//    }
-
-
     companion object {
         fun load(
             contractAddress: String,

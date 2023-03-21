@@ -1,7 +1,7 @@
 package com.example.ethktprototype.composables
 
+import TransactionViewModel
 import androidx.compose.foundation.layout.*
-
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -12,14 +12,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.ethktprototype.Network
+import com.example.ethktprototype.TokenBalance
 import java.math.BigDecimal
 
 
 @Composable
 fun PayDialog(
     onDismiss: () -> Unit,
-    onPay: (toAddress: String, amount: BigDecimal) -> Unit,
-    selectedNetwork: Network
+    onPay: (toAddress: String, amount: BigDecimal, contractAddress: String) -> Unit,
+    selectedNetwork: Network,
+    tokens: List<TokenBalance>,
+    transactionViewModel: TransactionViewModel,
 ) {
 
     var toAddress by remember { mutableStateOf("") }
@@ -28,7 +31,8 @@ fun PayDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .padding(16.dp).height(350.dp),
+                .padding(16.dp)
+                .height(450.dp),
 
             shape = RoundedCornerShape(16.dp),
             tonalElevation = 8.dp,
@@ -46,6 +50,8 @@ fun PayDialog(
                     )
                     BarcodeScanner(onScanResult = {result -> toAddress =result})
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                TokenDropdown(tokens = tokens, selectedToken = transactionViewModel.selectedToken.value, updateSelectedToken = {transactionViewModel.updateSelectedToken(it)} )
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = amount,
@@ -67,7 +73,10 @@ fun PayDialog(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(
-                        onClick = { onPay(toAddress, amount.toBigDecimal()) },
+                        onClick = { transactionViewModel.selectedToken.value?.let {
+                            onPay(toAddress, amount.toBigDecimal(),
+                                it.contractAddress)
+                        } },
                         enabled = toAddress.isNotBlank() && amount.isNotBlank() && amount != "0",
                     ) {
                         Text(text = "Send")

@@ -1,12 +1,22 @@
+import android.app.Application
+import android.content.Context
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.AndroidViewModel
 import com.example.ethktprototype.Network
+import com.example.ethktprototype.TokenBalance
 import com.example.ethktprototype.Web3jService
+import com.example.ethktprototype.getUserBalances
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import org.web3j.abi.FunctionEncoder
+import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.Function
+import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.TransactionEncoder
@@ -18,8 +28,21 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 
-class TransactionViewModel : ViewModel() {
+class TransactionViewModel(application: Application) : AndroidViewModel(application) {
     private val web3j = Web3jService.build(Network.MUMBAI_TESTNET)
+
+    private val balanceSharePrefs = application.getSharedPreferences("Balances", Context.MODE_PRIVATE)
+    private val walletSharePrefs = application.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
+    private val currentNetwork = walletSharePrefs.getString("SELECTED_NETWORK_NAME", null)
+    private val currentNetworkBalances = currentNetwork?.let { getUserBalances(application, it) }
+
+    private val _selectedToken = mutableStateOf<TokenBalance?>(currentNetworkBalances?.get(0))
+    val selectedToken: State<TokenBalance?> = _selectedToken
+
+    fun updateSelectedToken(token: TokenBalance?) {
+        Log.d("token", "updating _selectedToken to: $token")
+        _selectedToken.value = token
+    }
 
 
     suspend fun getGasPrice(): BigInteger {
@@ -40,6 +63,67 @@ class TransactionViewModel : ViewModel() {
         return BigInteger.valueOf((gasPriceInGwei).toLong())
     }
 
+    suspend fun sendTokens(credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal): String {
+        Log.d("send", "sending $value tokens to $toAddress")
+
+        return withContext(Dispatchers.IO) {
+            try {
+                // Get the nonce for the transaction
+                val nonce: BigInteger = web3j.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
+                    .send().transactionCount
+                val chainIdLong: Long = 80001
+
+
+                // Get the gas price and gas limit
+                val gasPrice = web3j.ethGasPrice().send().gasPrice
+                val gasLimit = DefaultGasProvider().gasLimit
+
+                // Create a function call to transfer tokens
+                val function = Function(
+                    "transfer",
+                    listOf(Address(toAddress), Uint256(Convert.toWei(value, Convert.Unit.ETHER).toBigInteger())),
+                    emptyList()
+                )
+
+                // Encode the function call to get the data that needs to be sent in the transaction
+                val encodedFunction = FunctionEncoder.encode(function)
+
+                // Create a raw transaction object
+                val transaction = RawTransaction.createTransaction(
+                    nonce,
+                    gasPrice,
+                    gasLimit,
+                    contractAddress,
+                    encodedFunction
+                )
+
+                // Sign the transaction using the credentials
+               // val signedTransaction = signTransaction(transaction, credentials)
+
+                // my attempt to fix only EIP allowed over RPC
+                val signedT = TransactionEncoder.signMessage(transaction, chainIdLong, credentials)
+
+                // Convert the signed transaction to hex format
+                val hexValue = Numeric.toHexString(signedT)
+
+                // Send the signed transaction to the network
+                val transactionResponse = web3j.ethSendRawTransaction(hexValue).sendAsync().get()
+
+                // Check if the transaction was successful or not
+                if (transactionResponse.hasError()) {
+                    Log.d("send", "transaction failed: ${transactionResponse.error.message}")
+                    Log.d("send", "full transaction: ${transactionResponse.error.data}")
+                    throw RuntimeException("Transaction failed: ${transactionResponse.error.message}")
+                } else {
+                    Log.d("send", "transaction successful, hash: ${transactionResponse.transactionHash}")
+                    transactionResponse.transactionHash
+                }
+            } catch (e: Exception) {
+                Log.e("send", "transaction failed: ${e.message}")
+                throw e
+            }
+        }
+    }
 
     suspend fun sendMatic(credentials: Credentials, toAddress: String, value: BigDecimal): String {
         Log.d("send", "sending $value to ${toAddress}")
@@ -82,67 +166,6 @@ class TransactionViewModel : ViewModel() {
             }
         }
     }
-
-
-//    suspend fun sendMatic(credentials: Credentials, toAddress: String, value: BigDecimal): String {
-//        Log.d("send", "sending $value to ${toAddress}")
-//        return withContext(Dispatchers.IO) {
-//            try {
-//                val nonce: BigInteger = web3j.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
-//                    .send().transactionCount // subtract a smaller value from the current nonce
-//
-//                val gasPrice = BigInteger.valueOf(80)
-//                val gasLimit = BigInteger.valueOf(21000)
-//
-//                val chainIdLong: Long = 80001
-//
-//                // Create a new instance of `org.web3j.crypto.RawTransaction` with the constructor that takes the
-//                // following arguments: nonce, gasPrice, gasLimit, toAddress, value, data. In this case, we don't
-//                // need to include any data, so we can pass null.
-//                val rawTransaction = RawTransaction.createEtherTransaction(
-//                    nonce,
-//                    gasLimit,
-//                    toAddress,
-//                    Convert.toWei(value, Convert.Unit.WEI).toBigInteger(),
-//                    gasPrice,
-//                    null
-//                )
-//
-//                // Create an EIP-155 signature data object using the `org.web3j.crypto.TransactionEncoder` class.
-////               val chainId = BigInteger.valueOf(80001)
-////               val signatureData = Sign.signMessage(rawTransaction, credentials.ecKeyPair, false)
-////                val eip155 = TransactionEncoder.createEip155SignatureData(signatureData, chainId.toLong())
-//
-//                // Use `org.web3j.crypto.TransactionEncoder` to encode the transaction using the `createEip155Transaction`
-//                // method. This method takes the same arguments as the `RawTransaction` constructor, as well as the
-//                // `v`, `r`, and `s` values from the `EIP155SignatureData` object.
-//                val transactionReceipt = Transfer.sendFundsEIP1559(
-//                    web3j,
-//                    credentials,
-//                    toAddress,
-//                    value,
-//                    Convert.Unit.WEI,
-//                gasLimit,
-//                gasPrice,
-//                null).send()
-//
-//
-////                val transactionResponse = web3j.ethSendRawTransaction(signedMessage).send()
-//
-//                if (!transactionReceipt.isStatusOK) {
-//                    Log.d("send", "transaction failed: ${transactionReceipt.transactionHash}")
-//
-//                    throw RuntimeException("Transaction failed: ${transactionReceipt}")
-//                } else {
-//                    Log.d("send", "transaction successful, hash: ${transactionReceipt.transactionHash}")
-//                    transactionReceipt.transactionHash
-//                }
-//            } catch (e: Exception) {
-//                Log.e("send", "transaction failed: ${e.message}")
-//                throw e
-//            }
-//        }
-//    }
 }
 
 
