@@ -10,9 +10,6 @@ import com.example.ethktprototype.Web3jService
 import com.example.ethktprototype.getUserBalances
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
@@ -36,31 +33,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val currentNetwork = walletSharePrefs.getString("SELECTED_NETWORK_NAME", null)
     private val currentNetworkBalances = currentNetwork?.let { getUserBalances(application, it) }
 
-    private val _selectedToken = mutableStateOf(currentNetworkBalances?.firstOrNull() ?: null)
+    private val _selectedToken = mutableStateOf(currentNetworkBalances?.firstOrNull())
     val selectedToken: State<TokenBalance?> = _selectedToken
 
     fun updateSelectedToken(token: TokenBalance?) {
         Log.d("token", "updating _selectedToken to: $token")
         _selectedToken.value = token
-    }
-
-
-    suspend fun getGasPrice(): BigInteger {
-        val url = "https://gasstation-mainnet.matic.network/v2"
-        val request = Request.Builder()
-            .url(url)
-            .build()
-
-        val response = withContext(Dispatchers.IO) {
-            OkHttpClient().newCall(request).execute()
-        }
-
-        val json = JSONObject(response.body?.string())
-        val gasPriceInGwei = json.getJSONObject("fast").getString("maxFee").toDouble()
-
-        Log.d("gas", "$gasPriceInGwei")
-
-        return BigInteger.valueOf((gasPriceInGwei).toLong())
     }
 
     suspend fun sendTokens(credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal): String {
@@ -110,48 +88,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 val transactionResponse = web3j.ethSendRawTransaction(hexValue).sendAsync().get()
 
                 // Check if the transaction was successful or not
-                if (transactionResponse.hasError()) {
-                    Log.d("send", "transaction failed: ${transactionResponse.error.message}")
-                    Log.d("send", "full transaction: ${transactionResponse.error.data}")
-                    throw RuntimeException("Transaction failed: ${transactionResponse.error.message}")
-                } else {
-                    Log.d("send", "transaction successful, hash: ${transactionResponse.transactionHash}")
-                    transactionResponse.transactionHash
-                }
-            } catch (e: Exception) {
-                Log.e("send", "transaction failed: ${e.message}")
-                throw e
-            }
-        }
-    }
-
-    suspend fun sendMatic(credentials: Credentials, toAddress: String, value: BigDecimal): String {
-        Log.d("send", "sending $value to ${toAddress}")
-        return withContext(Dispatchers.IO) {
-            try {
-                val nonce: BigInteger = web3j.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
-                    .send().transactionCount
-
-                val a = web3j.ethGasPrice().send().gasPrice
-                val gasMax = DefaultGasProvider().gasLimit
-
-
-                val chainIdLong: Long = 80001
-
-                val rawTransaction = RawTransaction.createEtherTransaction(
-                    nonce,
-                    a,
-                    gasMax,
-                    toAddress,
-                    Convert.toWei(value, Convert.Unit.ETHER).toBigInteger()
-                )
-
-                // Sign the transaction using the credentials and chain ID.
-                val signedMessage = TransactionEncoder.signMessage(rawTransaction, chainIdLong, credentials)
-                val hexValue = Numeric.toHexString(signedMessage)
-                // Send the signed transaction to the network.
-                val transactionResponse = web3j.ethSendRawTransaction(hexValue).sendAsync().get()
-
                 if (transactionResponse.hasError()) {
                     Log.d("send", "transaction failed: ${transactionResponse.error.message}")
                     Log.d("send", "full transaction: ${transactionResponse.error.data}")
