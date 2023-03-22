@@ -1,5 +1,7 @@
 # Simple Android Wallet 
 
+Docs will be updated here: https://simple-wallet-docs.vercel.app/
+
 ## Project goals
 1. Create a android native ethereum wallet.
 2. Make it as fast and small as possible
