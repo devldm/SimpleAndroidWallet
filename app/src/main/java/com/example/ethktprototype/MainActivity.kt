@@ -1,7 +1,7 @@
 package com.example.ethktprototype
 
-import TransactionViewModel
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
@@ -13,24 +13,22 @@ import androidx.navigation.compose.rememberNavController
 import com.example.ethktprototype.screens.MyMainScreen
 import com.example.ethktprototype.screens.TokenListScreen
 import com.example.ethktprototype.ui.theme.EthKtPrototypeTheme
-import org.web3j.crypto.MnemonicUtils
 
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: WalletViewModel
-    private lateinit var transactionViewModel: TransactionViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Initialize the view model
         viewModel = ViewModelProvider(this)[WalletViewModel::class.java]
-        transactionViewModel = ViewModelProvider(this)[TransactionViewModel::class.java]
-        viewModel.loadMnemonicFromPrefs(applicationContext)
+        viewModel.loadMnemonicFromPrefs()
 
         setContent {
             val navController = rememberNavController()
             val isWalletMnemonicInPrefs = viewModel.mnemonicLoaded.value
+            Log.d("MainActi", "${viewModel.mnemonicLoaded.value}")
             val startPoint = if (!isWalletMnemonicInPrefs) "mainScreen" else "tokenList"
 
             EthKtPrototypeTheme {
@@ -43,20 +41,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("tokenList") {
-                            TokenListScreen(navController, viewModel, transactionViewModel, application)
+                            TokenListScreen(navController, viewModel, application)
                         }
                     }
                 }
             }
         }
-    }
-}
-
-fun isValidMnemonic(mnemonic: String): Boolean {
-    return try {
-        MnemonicUtils.validateMnemonic(mnemonic)
-    } catch (e: Exception) {
-        false
     }
 }
 

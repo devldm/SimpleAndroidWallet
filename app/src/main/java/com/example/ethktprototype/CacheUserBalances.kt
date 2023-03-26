@@ -20,7 +20,7 @@ data class TokenBalance(
 )
 
 fun getBalancesSharedPreferences(application: Application): SharedPreferences {
-    return application.getSharedPreferences("Balances", Context.MODE_PRIVATE)
+    return application.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
 }
 
 fun getCacheExpirationTime(sharedPreferences: SharedPreferences): Long {
@@ -36,16 +36,16 @@ fun getTokenBalancesSharedPreferencesKey(selectedNetwork: String): String {
 
 fun cacheUserBalance(tokenBalance: TokenBalance, application: Application, selectedNetwork: String) {
     val sharedPreferences = getBalancesSharedPreferences(application)
-    Log.d("cache", "cached User balance $tokenBalance with key ${getTokenBalancesSharedPreferencesKey(selectedNetwork)}")
+    Log.d("cacheUserBalance", "cached User balance $tokenBalance with key ${getTokenBalancesSharedPreferencesKey(selectedNetwork)}")
     val existingBalances = getUserBalances(application, selectedNetwork)
 
-    Log.d("cache", "exisitingBalances: $existingBalances")
+    Log.d("cacheUserBalance", "exisitingBalances: $existingBalances")
     val newBalances = existingBalances.toMutableList()
     newBalances.removeAll { it.contractAddress == tokenBalance.contractAddress }
     newBalances.add(tokenBalance)
 
     val json = Json.encodeToString(newBalances)
-    Log.d("cache", "newBalances: $newBalances")
+    Log.d("cacheUserBalance", "newBalances: $newBalances")
 
     sharedPreferences.edit().putString(getTokenBalancesSharedPreferencesKey(selectedNetwork), json).apply()
 }
@@ -56,7 +56,7 @@ fun getUserBalances(application: Application, selectedNetwork: String): List<Tok
     val currentTime = System.currentTimeMillis() / 1000
 
     val json = sharedPreferences.getString(getTokenBalancesSharedPreferencesKey(selectedNetwork), null)
-    Log.d("ggub", "$json")
+    Log.d("getUserBalance", "$json")
 
     return if (json != null && cacheExpirationTime > currentTime) {
         try {

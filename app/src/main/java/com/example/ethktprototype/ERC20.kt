@@ -6,6 +6,7 @@ import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.generated.Uint8
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.tx.Contract
@@ -13,10 +14,7 @@ import org.web3j.tx.gas.DefaultGasProvider
 import java.math.BigInteger
 
 class ERC20(
-    contractAddress: String,
-    web3j: Web3j,
-    credentials: Credentials,
-    gasProvider: DefaultGasProvider
+    contractAddress: String, web3j: Web3j, credentials: Credentials, gasProvider: DefaultGasProvider
 ) : Contract(ERC20_ABI, contractAddress, web3j, credentials, gasProvider) {
     init {
         try {
@@ -29,9 +27,7 @@ class ERC20(
     fun balanceOf(address: String): BigInteger {
         Log.d("TokenListScreen", "Calling balanceOf function for address $address")
         val function = Function(
-            "balanceOf",
-            listOf(Address(address)),
-            listOf(object : TypeReference<Type<*>>() {})
+            "balanceOf", listOf(Address(address)), listOf(object : TypeReference<Type<*>>() {})
         )
         val encodedFunction = FunctionEncoder.encode(function)
 
@@ -39,9 +35,7 @@ class ERC20(
 
         val response = executeCallSingleValueReturn<Uint256>(
             Function(
-                "balanceOf",
-                listOf(Address(address)),
-                listOf(object : TypeReference<Uint256>() {})
+                "balanceOf", listOf(Address(address)), listOf(object : TypeReference<Uint256>() {})
             )
         )
 
@@ -53,9 +47,7 @@ class ERC20(
 
     fun name(): String {
         val function = Function(
-            "name",
-            emptyList(),
-            listOf(object : TypeReference<Utf8String>() {})
+            "name", emptyList(), listOf(object : TypeReference<Utf8String>() {})
         )
 
         val response = executeCallSingleValueReturn<Utf8String>(function)
@@ -65,15 +57,24 @@ class ERC20(
 
     fun symbol(): String {
         val function = Function(
-            "symbol",
-            emptyList(),
-            listOf(object : TypeReference<Utf8String>() {})
+            "symbol", emptyList(), listOf(object : TypeReference<Utf8String>() {})
         )
 
         val response = executeCallSingleValueReturn<Utf8String>(function)
 
         return response.value
     }
+
+    fun decimals(): BigInteger {
+        val function = Function(
+            "decimals", emptyList(), listOf(object : TypeReference<Uint8>() {})
+        )
+
+        val response = executeCallSingleValueReturn<Uint8>(function)
+
+        return response.value
+    }
+
     companion object {
         fun load(
             contractAddress: String,
@@ -85,7 +86,6 @@ class ERC20(
         }
     }
 }
-
 
 
 private val ERC20_ABI = """
@@ -150,7 +150,21 @@ private val ERC20_ABI = """
                     "payable": false,
                     "stateMutability": "view",
                     "type": "function"
+                },
+                 {
+            "constant": true,
+            "inputs": [],
+            "name": "decimals",
+            "outputs": [
+                {
+                    "name": "",
+                    "type": "uint8"
                 }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        }
     ]
 """.trimIndent()
 

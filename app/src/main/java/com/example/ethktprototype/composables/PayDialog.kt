@@ -1,6 +1,5 @@
 package com.example.ethktprototype.composables
 
-import TransactionViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.ethktprototype.Network
 import com.example.ethktprototype.TokenBalance
+import com.example.ethktprototype.WalletViewModel
 import java.math.BigDecimal
 
 
@@ -22,7 +22,7 @@ fun PayDialog(
     onPay: (toAddress: String, amount: BigDecimal, contractAddress: String) -> Unit,
     selectedNetwork: Network,
     tokens: List<TokenBalance>,
-    transactionViewModel: TransactionViewModel,
+    viewModel: WalletViewModel,
 ) {
 
     var toAddress by remember { mutableStateOf("") }
@@ -51,7 +51,7 @@ fun PayDialog(
                     BarcodeScanner(onScanResult = {result -> toAddress =result})
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                TokenDropdown(tokens = tokens, selectedToken = transactionViewModel.selectedToken.value, updateSelectedToken = {transactionViewModel.updateSelectedToken(it)} )
+                TokenDropdown(tokens = tokens, selectedToken = viewModel.selectedToken.value, updateSelectedToken = {viewModel.updateSelectedToken(it)} )
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = amount,
@@ -73,7 +73,7 @@ fun PayDialog(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(
-                        onClick = { transactionViewModel.selectedToken.value?.let {
+                        onClick = { viewModel.selectedToken.value?.let {
                             onPay(toAddress, amount.toBigDecimal(),
                                 it.contractAddress)
                         } },

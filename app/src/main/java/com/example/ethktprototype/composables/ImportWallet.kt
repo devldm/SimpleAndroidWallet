@@ -14,7 +14,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.ethktprototype.WalletViewModel
-import com.example.ethktprototype.isValidMnemonic
+import utils.isValidMnemonic
+import utils.loadBip44Credentials
+
 
 @Composable
 fun ImportWallet(
@@ -22,7 +24,6 @@ fun ImportWallet(
     onWalletImported: (String) -> Unit,
     viewModel: WalletViewModel
 ) {
-    val context = LocalContext.current // get the Context object from the LocalContext
     var errorMessage by remember { mutableStateOf("") }
 
     Surface(
@@ -72,9 +73,9 @@ fun ImportWallet(
                         try {
                             // TODO: See if other wallets work with Bip44
                             //val wallet = WalletUtils.loadBip39Credentials("", mnemonic)
-                            val wallet = viewModel.loadBip44Credentials(mnemonic)
+                            val wallet = loadBip44Credentials(mnemonic)
                             onWalletImported(wallet.address)
-                            viewModel.storeMnemonic(mnemonic, context)
+                            viewModel.storeMnemonic(mnemonic)
                         } catch (e: Exception) {
                             errorMessage = "Failed to import wallet: ${e.message}"
                         }

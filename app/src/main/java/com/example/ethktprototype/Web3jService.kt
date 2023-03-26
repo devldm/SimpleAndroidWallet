@@ -13,14 +13,9 @@ object Web3jService {
 
 }
 
-enum class Network(val displayName: String, val url: String) {
-    POLYGON_MAINNET("Polygon", "https://polygon-rpc.com/"),
-    MUMBAI_TESTNET("Mumbai Testnet", "https://rpc-mumbai.maticvigil.com/")
+enum class Network(val displayName: String, val url: String, val chainId: Long) {
+    POLYGON_MAINNET("Polygon", "https://polygon-rpc.com/", 137),
+    MUMBAI_TESTNET("Mumbai Testnet", "https://rpc-mumbai.maticvigil.com/",80001)
 }
-
-val networks = listOf(
-    Pair(Network.POLYGON_MAINNET.displayName, Network.POLYGON_MAINNET.url),
-    Pair(Network.MUMBAI_TESTNET.displayName, Network.MUMBAI_TESTNET.url)
-)
 
 
