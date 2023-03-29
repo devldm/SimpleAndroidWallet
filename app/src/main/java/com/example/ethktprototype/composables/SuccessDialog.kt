@@ -20,6 +20,7 @@ import androidx.compose.ui.window.Dialog
 fun SuccessDialogModal(
     value: String,
     address: String,
+    sentCurrency: String,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -50,7 +51,7 @@ fun SuccessDialogModal(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Sent $value to $address",
+                    text = "Sent $value $sentCurrency to $address",
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     fontSize = 15.sp

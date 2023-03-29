@@ -13,6 +13,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
@@ -24,21 +25,23 @@ import org.web3j.crypto.WalletUtils
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
+import org.web3j.tx.Transfer
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.utils.Convert
 import org.web3j.utils.Numeric
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.net.HttpURLConnection
+import java.net.URL
 
 class WalletRepository(private val application: Application) : IWalletRepository {
     val context = application.applicationContext
-    private val sharedPreferences = context.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
+    private val sharedPreferences =
+        context.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
     private val walletAddressKey = "wallet_address"
     private val _selectedNetwork = mutableStateOf(Network.MUMBAI_TESTNET)
     val selectedNetwork: MutableState<Network> = _selectedNetwork
     val mnemonicLoaded = MutableLiveData<Boolean>()
-
-    //private val web3jService = Web3jService.build(selectedNetwork.value)
 
     override fun storeMnemonic(mnemonic: String) {
         encryptMnemonic(context, mnemonic)
@@ -51,11 +54,11 @@ class WalletRepository(private val application: Application) : IWalletRepository
         mnemonicLoaded.value = true
     }
 
-    override fun loadMnemonicFromPrefs() {
+    override fun loadMnemonicFromPrefs(): String? {
         val prefs = context.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
         val storedMnemonic = prefs.getString("encrypted_mnemonic", null)
         mnemonicLoaded.value = storedMnemonic != null
-        storedMnemonic
+        return storedMnemonic
     }
 
     fun updateSelectedNetwork(network: Network): Network {
@@ -79,82 +82,111 @@ class WalletRepository(private val application: Application) : IWalletRepository
         return getDecryptedMnemonic(context)
     }
 
+    fun getGasPrices(): Pair<BigInteger, BigInteger> {
+        val endpoint = "https://gasstation-mainnet.matic.network/v2"
+        val url = URL(endpoint)
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+
+        val responseCode = connection.responseCode
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            val responseString = connection.inputStream.bufferedReader().use { it.readText() }
+            val jsonResponse = JSONObject(responseString)
+            val standard = jsonResponse.getJSONObject("standard")
+            val maxPriorityFee = standard.getDouble("maxPriorityFee")
+            val maxFee = standard.getDouble("maxFee")
+            val maxFeeWei = Convert.toWei(BigDecimal(maxFee), Convert.Unit.GWEI).toBigInteger()
+            val maxPriorityFeeWei =
+                Convert.toWei(BigDecimal(maxPriorityFee), Convert.Unit.GWEI).toBigInteger()
+            return Pair(maxPriorityFeeWei, maxFeeWei)
+        } else {
+            throw Exception("Failed to retrieve data from $endpoint. Response code: $responseCode")
+        }
+    }
+
     override suspend fun sendTokens(credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal): String {
         Log.d("send", "sending $value tokens to $toAddress")
         Log.d("send", "network is: ${selectedNetwork.value}")
         val web3jService = Web3jService.build(selectedNetwork.value)
+        val contract = ERC20.load(contractAddress, web3jService, credentials, DefaultGasProvider())
+        val decimals = contract.decimals()
+        Log.d("send", "${contract.name()} has $decimals decimals")
+        val gasPrice = web3jService.ethGasPrice().send().gasPrice
+        Log.d("send", "gasPrice is $gasPrice")
+
+        val function = Function(
+            "transfer",
+            listOf(Address(toAddress), Uint256(Convert.toWei(value.multiply(BigDecimal.TEN.pow(decimals.toInt())), Convert.Unit.WEI).toBigInteger())),
+            emptyList()
+        )
+        val nonce: BigInteger = web3jService.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
+            .send().transactionCount
+
+        // Encode the function call to get the data that needs to be sent in the transaction
+        val encodedFunction = FunctionEncoder.encode(function)
+
+        val ethEstimateGas = web3jService.ethEstimateGas(
+            Transaction.createFunctionCallTransaction(
+                credentials.address, nonce, gasPrice, null, toAddress, encodedFunction
+            )
+        ).send()
+
+        val gasLimit = ethEstimateGas.amountUsed.plus(BigInteger.valueOf(40000))
+
+        val (maxPriorityFeeWei, maxFeeWei) = getGasPrices()
+
 
         return withContext(Dispatchers.IO) {
             try {
-                // Get the nonce for the transaction
-                val nonce: BigInteger = web3jService.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
-                    .send().transactionCount
-                //val gasLimit = web3jService.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send().block.gasLimit
 
-                val contract = ERC20.load(contractAddress, web3jService, credentials, DefaultGasProvider())
-                val decimals = contract.decimals()
-                Log.d("send", "${contract.name()} has $decimals decimals")
-                // Get the gas price and gas limit
-                val gasPrice = web3jService.ethGasPrice().send().gasPrice
-                Log.d("send", "gasPrice is $gasPrice")
+                if(contractAddress == "0x0000000000000000000000000000000000001010") {
+                    val transfer = Transfer.sendFundsEIP1559(
+                        web3jService,
+                        credentials,
+                        toAddress,
+                        Convert.toWei(value.multiply(BigDecimal.TEN.pow(decimals.toInt())), Convert.Unit.WEI),
+                        Convert.Unit.WEI,
+                        gasLimit,
+                        maxPriorityFeeWei,
+                        maxFeeWei
+                    ).sendAsync().get()
 
-               // val gasLimit = DefaultGasProvider().gasLimit
-               //TODO: try to add ethEstimateGasUsed for rudimentary simulation
-                //Log.d("send", "gasLimit is $gasLimit")
-                ///Log.d("send", "gasLimit should be $a")
-
-                // Create a function call to transfer tokens
-                val function = Function(
-                    "transfer",
-                    listOf(Address(toAddress), Uint256(Convert.toWei(value.multiply(BigDecimal.TEN.pow(decimals.toInt())), Convert.Unit.WEI).toBigInteger())),
-                    emptyList()
-                )
-
-                // Encode the function call to get the data that needs to be sent in the transaction
-                val encodedFunction = FunctionEncoder.encode(function)
-
-                val ethEstimateGas = web3jService.ethEstimateGas(
-                    Transaction.createFunctionCallTransaction(
-                       credentials.address, nonce, gasPrice, null, toAddress, encodedFunction
-                    )
-                ).send()
-
-                val gasLimit = ethEstimateGas.amountUsed.plus(BigInteger.valueOf(40000))
-
-                //Log.d("send","is $gasLimit")
-
-                //val gasLimit = DefaultGasProvider.GAS_LIMIT
-
-                // Create a raw transaction object
-                val transaction = RawTransaction.createTransaction(
-                    nonce,
-                    gasPrice,
-                    gasLimit,
-                    contractAddress,
-                    encodedFunction
-                )
-
-                // Sign the transaction using the credentials
-                // val signedTransaction = signTransaction(transaction, credentials)
-
-                // my attempt to fix only EIP allowed over RPC
-                val signedT = TransactionEncoder.signMessage(transaction, selectedNetwork.value.chainId, credentials)
-
-                // Convert the signed transaction to hex format
-                val hexValue = Numeric.toHexString(signedT)
-
-                // Send the signed transaction to the network
-                val transactionResponse = web3jService.ethSendRawTransaction(hexValue).sendAsync().get()
-
-                // Check if the transaction was successful or not
-                if (transactionResponse.hasError()) {
-                    Log.d("send", "transaction failed: ${transactionResponse.error.message}")
-                    Log.d("send", "full transaction: ${transactionResponse.error.data}")
-                    throw RuntimeException("Transaction failed: ${transactionResponse.error.message}")
+                    if(transfer.isStatusOK) {
+                        Log.d("send", "EIP1559 transaction successful, hash: ${transfer.transactionHash}")
+                        transfer.transactionHash
+                    } else {
+                        throw RuntimeException("EIP1559 Transaction failed: ${transfer.logs}")
+                    }
                 } else {
-                    Log.d("send", "transaction successful, hash: ${transactionResponse.transactionHash}")
-                    transactionResponse.transactionHash
+                    // Create a raw transaction object
+                    val transaction = RawTransaction.createTransaction(
+                        nonce,
+                        gasPrice,
+                        gasLimit,
+                        contractAddress,
+                        encodedFunction
+                    )
+
+                    // my attempt to fix only EIP allowed over RPC
+                    val signedT = TransactionEncoder.signMessage(transaction, selectedNetwork.value.chainId, credentials)
+
+                    // Convert the signed transaction to hex format
+                    val hexValue = Numeric.toHexString(signedT)
+
+                    // Send the signed transaction to the network
+                    val transactionResponse = web3jService.ethSendRawTransaction(hexValue).sendAsync().get()
+
+                    // Check if the transaction was successful or not
+                    if (transactionResponse.hasError()) {
+                        Log.d("send", "transaction failed: ${transactionResponse.error.message}")
+                        Log.d("send", "full transaction: ${transactionResponse.error.data}")
+                        throw RuntimeException("Transaction failed: ${transactionResponse.error.message}")
+                    } else {
+                        Log.d("send", "transaction successful, hash: ${transactionResponse.transactionHash}")
+                        transactionResponse.transactionHash
+                    }
                 }
+
             } catch (e: Exception) {
                 Log.e("send", "transaction failed: ${e.message}")
                 throw e
@@ -163,23 +195,23 @@ class WalletRepository(private val application: Application) : IWalletRepository
     }
 
 
-     override suspend fun getTokens(walletAddress: String, contractAddresses: List<String>, selectedNetwork: Network): List<TokenBalance> {
+    override suspend fun getTokens(
+        walletAddress: String,
+        contractAddresses: List<String>,
+        selectedNetwork: Network
+    ): List<TokenBalance> {
         val currentTime = System.currentTimeMillis() / 1000
-         Log.d("getTokens", "moment before crash selectedNetwork: ${selectedNetwork}")
-         val web3jService = Web3jService.build(selectedNetwork)
-
-         //Log.d("getTokens", "walletAddress: $walletAddress")
-         //Log.d("getTokens", "contractAddresses: $contractAddresses")
+        Log.d("getTokens", "moment before crash selectedNetwork: ${selectedNetwork}")
+        val web3jService = Web3jService.build(selectedNetwork)
 
         // Use flag to indicate whether network calls have already been made or not
         var networkCallsMade = false
 
         val mnemonic = getMnemonic()
 
-         //Log.d("getTokens", "getMnemonic returns: $mnemonic")
+        //Log.d("getTokens", "getMnemonic returns: $mnemonic")
 
         val credentials = if (!mnemonic.isNullOrEmpty()) {
-            //Log.d("getTokens", "loading credentials with mnemonic $mnemonic")
             WalletUtils.loadBip39Credentials(null, mnemonic)
         } else {
             null
@@ -189,7 +221,8 @@ class WalletRepository(private val application: Application) : IWalletRepository
             Log.d("getTokens", "making network calls")
             Log.d("getTokens", "using Network: ${selectedNetwork.displayName}")
             networkCallsMade = true
-            val tokenBalances = getTokenBalances(walletAddress, contractAddresses, web3jService, credentials)
+            val tokenBalances =
+                getTokenBalances(walletAddress, contractAddresses, web3jService, credentials)
 
             tokenBalances.forEach { tokenBalance ->
                 cacheUserBalance(
@@ -214,7 +247,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
         return balances
     }
 
-     override fun getTokenBalances(
+    override fun getTokenBalances(
         walletAddress: String,
         contractAddresses: List<String>,
         web3j: Web3j,

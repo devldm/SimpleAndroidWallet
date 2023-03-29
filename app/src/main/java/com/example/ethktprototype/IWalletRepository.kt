@@ -20,7 +20,7 @@ interface IWalletRepository {
 
     fun storeMnemonic(mnemonic: String)
 
-    fun loadMnemonicFromPrefs()
+    fun loadMnemonicFromPrefs(): String?
 
     fun getMnemonic(): String?
 

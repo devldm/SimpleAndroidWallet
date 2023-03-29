@@ -11,6 +11,8 @@ import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.tx.Contract
 import org.web3j.tx.gas.DefaultGasProvider
+import org.web3j.utils.Convert
+import java.math.BigDecimal
 import java.math.BigInteger
 
 class ERC20(
@@ -22,6 +24,21 @@ class ERC20(
         } catch (e: Exception) {
             Log.e("ERC20", "Error initializing contract at address $contractAddress: ${e.message}")
         }
+    }
+
+    fun transfer(toAddress: String, value: BigDecimal): String {
+        val function = Function(
+            "transfer", listOf(
+                Address(toAddress), Uint256(
+                    Convert.toWei(
+                        value.multiply(BigDecimal.TEN.pow(decimals().toInt())), Convert.Unit.WEI
+                    ).toBigInteger()
+                )
+            ), emptyList()
+        )
+
+        val encodedFunction = FunctionEncoder.encode(function)
+        return encodedFunction
     }
 
     fun balanceOf(address: String): BigInteger {
@@ -164,7 +181,18 @@ private val ERC20_ABI = """
             "payable": false,
             "stateMutability": "view",
             "type": "function"
-        }
+        },
+        "name": "transfer",
+        "outputs": [
+            {
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
     ]
 """.trimIndent()
 

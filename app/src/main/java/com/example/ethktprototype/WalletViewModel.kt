@@ -92,7 +92,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val balances = walletRepo.getTokens(walletAddress!!, getTokenContractAddresses(), selectedNetwork.value)
+                val balances = walletRepo.getTokens(walletAddress!!, getTokenContractAddresses(selectedNetwork.value), selectedNetwork.value)
                 tokens.postValue(balances)
             }
             loading.value = false

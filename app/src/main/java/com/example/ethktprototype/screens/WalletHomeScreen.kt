@@ -47,12 +47,16 @@ fun TokenListScreen(
     var sentAmount by remember {
         mutableStateOf(0.0)
     }
+    var sentCurrency by remember {
+        mutableStateOf("")
+    }
 
 
     fun onPayConfirmed(address: String, amount: Double, contractAddress: String) {
         val mnemonic = viewModel.getMnemonic()
         toAddress = address
         sentAmount = amount
+        sentCurrency = viewModel.selectedToken.value?.symbol ?: ""
 
         if (!mnemonic.isNullOrEmpty()) {
             val credentials = loadBip44Credentials(mnemonic)
@@ -138,6 +142,7 @@ fun TokenListScreen(
             if (showSuccessModal) {
                 SuccessDialogModal(value = sentAmount.toString(),
                     address = toAddress,
+                    sentCurrency = sentCurrency,
                     onDismiss = { showSuccessModal = false; viewModel.hash = MutableLiveData("") })
             }
 
@@ -170,7 +175,7 @@ fun TokenListScreen(
                 Log.d("tokens UI", "$tokens")
                 val t = tokens[token]
                 val balanceInEth = t.balance.toBigDecimal().divide(BigDecimal.TEN.pow(18))
-                val formatBalance = balanceInEth?.let { String.format("%.2f", it) } ?: "N/A"
+                val formatBalance = balanceInEth?.let { String.format("%.4f", it) } ?: "N/A"
 
                 Column(
                     modifier = Modifier
