@@ -34,18 +34,12 @@ fun getTokenBalancesSharedPreferencesKey(selectedNetwork: String): String {
     return "${selectedNetwork}_$TOKEN_BALANCES_KEY"
 }
 
-fun cacheUserBalance(tokenBalance: TokenBalance, application: Application, selectedNetwork: String) {
+fun cacheUserBalance(tokenBalance: List<TokenBalance>, application: Application, selectedNetwork: String) {
     val sharedPreferences = getBalancesSharedPreferences(application)
-    Log.d("cacheUserBalance", "cached User balance $tokenBalance with key ${getTokenBalancesSharedPreferencesKey(selectedNetwork)}")
     val existingBalances = getUserBalances(application, selectedNetwork)
+    existingBalances.toMutableList().clear()
 
-    Log.d("cacheUserBalance", "exisitingBalances: $existingBalances")
-    val newBalances = existingBalances.toMutableList()
-    newBalances.removeAll { it.contractAddress == tokenBalance.contractAddress }
-    newBalances.add(tokenBalance)
-
-    val json = Json.encodeToString(newBalances)
-    Log.d("cacheUserBalance", "newBalances: $newBalances")
+    val json = Json.encodeToString(tokenBalance)
 
     sharedPreferences.edit().putString(getTokenBalancesSharedPreferencesKey(selectedNetwork), json).apply()
 }
@@ -56,13 +50,13 @@ fun getUserBalances(application: Application, selectedNetwork: String): List<Tok
     val currentTime = System.currentTimeMillis() / 1000
 
     val json = sharedPreferences.getString(getTokenBalancesSharedPreferencesKey(selectedNetwork), null)
-    Log.d("getUserBalance", "$json")
+    Log.d("getUserBalance", "cached values $json")
 
-    return if (json != null && cacheExpirationTime > currentTime) {
+    return if (!json.isNullOrEmpty() && cacheExpirationTime > currentTime) {
         try {
             val type = object : TypeToken<List<TokenBalance>>() {}.type
             val jsonReturn = Json.decodeFromString<List<TokenBalance>>(json)
-            Log.d("getUserBalances", "$jsonReturn")
+            Log.d("getUserBalances", "getUserBalanes $jsonReturn")
 
             jsonReturn
         } catch (e: Exception) {

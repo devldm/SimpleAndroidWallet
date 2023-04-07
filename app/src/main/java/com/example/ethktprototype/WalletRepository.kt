@@ -3,8 +3,6 @@ package com.example.ethktprototype
 import ERC20
 import android.app.Application
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.MutableState
@@ -70,7 +68,6 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
     fun storeWallet(walletAddress: String) {
         // Store the wallet address in SharedPreferences
-        Log.d("storeWallet", "Storing: $walletAddress")
         sharedPreferences.edit {
             putString(walletAddressKey, walletAddress)
             apply()
@@ -105,14 +102,10 @@ class WalletRepository(private val application: Application) : IWalletRepository
     }
 
     override suspend fun sendTokens(credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal): String {
-        Log.d("send", "sending $value tokens to $toAddress")
-        Log.d("send", "network is: ${selectedNetwork.value}")
         val web3jService = Web3jService.build(selectedNetwork.value)
         val contract = ERC20.load(contractAddress, web3jService, credentials, DefaultGasProvider())
         val decimals = contract.decimals()
-        Log.d("send", "${contract.name()} has $decimals decimals")
         val gasPrice = web3jService.ethGasPrice().send().gasPrice
-        Log.d("send", "gasPrice is $gasPrice")
 
         val function = Function(
             "transfer",
@@ -201,50 +194,38 @@ class WalletRepository(private val application: Application) : IWalletRepository
         selectedNetwork: Network
     ): List<TokenBalance> {
         val currentTime = System.currentTimeMillis() / 1000
-        Log.d("getTokens", "moment before crash selectedNetwork: ${selectedNetwork}")
-        val web3jService = Web3jService.build(selectedNetwork)
-
-        // Use flag to indicate whether network calls have already been made or not
-        var networkCallsMade = false
-
-        val mnemonic = getMnemonic()
-
-        //Log.d("getTokens", "getMnemonic returns: $mnemonic")
-
-        val credentials = if (!mnemonic.isNullOrEmpty()) {
-            WalletUtils.loadBip39Credentials(null, mnemonic)
-        } else {
-            null
-        }
-
-        val balances = withContext(Dispatchers.IO) {
-            Log.d("getTokens", "making network calls")
-            Log.d("getTokens", "using Network: ${selectedNetwork.displayName}")
-            networkCallsMade = true
-            val tokenBalances =
-                getTokenBalances(walletAddress, contractAddresses, web3jService, credentials)
-
-            tokenBalances.forEach { tokenBalance ->
-                cacheUserBalance(
-                    tokenBalance,
-                    application,
-                    selectedNetwork = selectedNetwork.displayName,
-                )
-            }
-            Log.d("getTokens", "$tokenBalances")
-            tokenBalances
-        }
-
-        // Update the cache expiration time
         val sharedPreferences = getBalancesSharedPreferences(application)
-        sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime).apply()
+        val cacheExpirationTime = getCacheExpirationTime(sharedPreferences)
+        val cachedBalances = getUserBalances(application, selectedNetwork.displayName)
 
-        // Set networkCallsMade to false after a certain delay
-        Handler(Looper.getMainLooper()).postDelayed({
-            networkCallsMade = false
-        }, getCacheExpirationTime(sharedPreferences))
+        return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
+            // Return the cached balances if they are still valid
+            Log.d("newGetTokens", "using cached Balances $cachedBalances")
+            cachedBalances
+        } else {
+            // Fetch the balances from the network and update the cache
+            val web3jService = Web3jService.build(selectedNetwork)
+            Log.d("newGetTokens", "Making network calls")
 
-        return balances
+            val mnemonic = getMnemonic()
+            val credentials = if (!mnemonic.isNullOrEmpty()) {
+                WalletUtils.loadBip39Credentials(null, mnemonic)
+            } else {
+                null
+            }
+
+            val balances = withContext(Dispatchers.IO) {
+                val tokenBalances =
+                    getTokenBalances(walletAddress, contractAddresses, web3jService, credentials)
+                cacheUserBalance(tokenBalances, application, selectedNetwork.displayName)
+                tokenBalances
+            }
+
+            // Update the cache expiration time
+            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime).apply()
+
+            balances
+        }
     }
 
     override fun getTokenBalances(

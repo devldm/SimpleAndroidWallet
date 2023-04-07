@@ -48,18 +48,13 @@ class ERC20(
         )
         val encodedFunction = FunctionEncoder.encode(function)
 
-        Log.d("ERC20", "Encoded function: $encodedFunction")
-
         val response = executeCallSingleValueReturn<Uint256>(
             Function(
                 "balanceOf", listOf(Address(address)), listOf(object : TypeReference<Uint256>() {})
             )
         )
 
-        Log.d("ERC20", "Response: $response")
-        val balance = response.value as BigInteger
-        Log.d("ERC20", "Balance of $address is $balance")
-        return balance
+        return response.value as BigInteger
     }
 
     fun name(): String {

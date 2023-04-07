@@ -36,6 +36,7 @@ fun TokenListScreen(
     val tokens by tokensState.observeAsState(emptyList())
     val hashState = viewModel.hash.observeAsState()
     var hash by remember { mutableStateOf("") }
+    val initialSelectedNetwork = remember { viewModel.selectedNetwork.value }
     var showPayDialog by remember { mutableStateOf(false) }
     var showWalletModal by remember { mutableStateOf(false) }
     var showSuccessModal by remember { mutableStateOf(false) }
@@ -60,33 +61,28 @@ fun TokenListScreen(
 
         if (!mnemonic.isNullOrEmpty()) {
             val credentials = loadBip44Credentials(mnemonic)
-            Log.d("send", "credentials: ${credentials.address}")
-
             credentials.let {
                 viewModel.sendTokens(
                     credentials, contractAddress, address, BigDecimal.valueOf(amount)
                 )
-                Log.d("send", "hash = ${hashState}")
                 showPayDialog = false
             }
         }
     }
 
     if (!hashState.value.isNullOrEmpty() && hash != hashState.value) {
-        Log.d("showSucces", "hashState: $hashState")
         showSuccessModal = true
         hash = hashState.value!!
     }
 
-    Log.d("network", "selectedNetwork: ${viewModel.selectedNetwork.value}")
-
     LaunchedEffect(viewModel.selectedNetwork.value) {
-        Log.d("network", "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
-        viewModel.getTokens(application)
+        if(initialSelectedNetwork != viewModel.selectedNetwork.value) {
+            Log.d(
+                "getTokens",
+                "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
+            viewModel.getTokens(application)
+        }
     }
-
-
-    Log.d("TokenListScreen", "Tokens size: ${tokens.size}")
 
     LazyColumn(
         modifier = Modifier
@@ -148,8 +144,15 @@ fun TokenListScreen(
 
             // show the pay dialog if the state variable is true
             if (showPayDialog) {
-                PayDialog(onDismiss = { showPayDialog = false },
-                    onPay = { address, amount, contractAddress -> onPayConfirmed(address, amount.toDouble(), contractAddress) },
+                PayDialog(
+                    onDismiss = { showPayDialog = false },
+                    onPay = { address, amount, contractAddress ->
+                        onPayConfirmed(
+                            address,
+                            amount.toDouble(),
+                            contractAddress
+                        )
+                    },
                     selectedNetwork = viewModel.selectedNetwork.value,
                     tokens = tokens,
                     viewModel = viewModel
@@ -163,16 +166,19 @@ fun TokenListScreen(
             }
         } else if (!viewModel.loading.value && tokens.isEmpty()) {
             item {
-                Column(modifier = Modifier
-                    .fillMaxSize()
-                    .fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally,) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text("No tokens found for this wallet")
                 }
 
             }
         } else {
             items(tokens.size) { token ->
-                Log.d("tokens UI", "$tokens")
                 val t = tokens[token]
                 val balanceInEth = t.balance.toBigDecimal().divide(BigDecimal.TEN.pow(18))
                 val formatBalance = balanceInEth?.let { String.format("%.4f", it) } ?: "N/A"

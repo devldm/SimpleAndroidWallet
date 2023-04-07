@@ -2,7 +2,6 @@ package com.example.ethktprototype
 
 import android.app.Application
 import android.content.Context
-import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +40,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     var hash = MutableLiveData<String>()
 
     fun updateSelectedToken(token: TokenBalance?) {
-        Log.d("token", "updating _selectedToken to: $token")
         _selectedToken.value = token
     }
 
@@ -80,7 +78,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateSelectedNetwork(network: Network) {
         val network = walletRepository.updateSelectedNetwork(network)
-        Log.d("updateSelectedNetwork","VM network: $network")
         _selectedNetwork.value = network
     }
 
@@ -108,10 +105,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                val returnedHash = walletRepository.sendTokens(
                     credentials, contractAddress, toAddress, value
                 )
-                Log.d("send", "returnedHash: $returnedHash")
                 hash.postValue(returnedHash)
             }
         }
-        Log.d("send", "hash returned from viewModel: ${hash.value}")
     }
 }
