@@ -3,7 +3,6 @@ package com.example.ethktprototype
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import com.google.common.reflect.TypeToken
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
@@ -50,14 +49,11 @@ fun getUserBalances(application: Application, selectedNetwork: String): List<Tok
     val currentTime = System.currentTimeMillis() / 1000
 
     val json = sharedPreferences.getString(getTokenBalancesSharedPreferencesKey(selectedNetwork), null)
-    Log.d("getUserBalance", "cached values $json")
 
     return if (!json.isNullOrEmpty() && cacheExpirationTime > currentTime) {
         try {
             val type = object : TypeToken<List<TokenBalance>>() {}.type
             val jsonReturn = Json.decodeFromString<List<TokenBalance>>(json)
-            Log.d("getUserBalances", "getUserBalanes $jsonReturn")
-
             jsonReturn
         } catch (e: Exception) {
             emptyList()

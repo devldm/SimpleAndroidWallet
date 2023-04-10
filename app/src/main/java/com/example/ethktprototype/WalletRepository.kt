@@ -60,7 +60,6 @@ class WalletRepository(private val application: Application) : IWalletRepository
     }
 
     fun updateSelectedNetwork(network: Network): Network {
-        Log.d("network", "updating _selectedNetwork to: $network")
         selectedNetwork.value = network
         sharedPreferences.edit().putString("SELECTED_NETWORK_NAME", network.displayName).apply()
         return network
@@ -145,7 +144,6 @@ class WalletRepository(private val application: Application) : IWalletRepository
                     ).sendAsync().get()
 
                     if(transfer.isStatusOK) {
-                        Log.d("send", "EIP1559 transaction successful, hash: ${transfer.transactionHash}")
                         transfer.transactionHash
                     } else {
                         throw RuntimeException("EIP1559 Transaction failed: ${transfer.logs}")
@@ -171,11 +169,8 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
                     // Check if the transaction was successful or not
                     if (transactionResponse.hasError()) {
-                        Log.d("send", "transaction failed: ${transactionResponse.error.message}")
-                        Log.d("send", "full transaction: ${transactionResponse.error.data}")
                         throw RuntimeException("Transaction failed: ${transactionResponse.error.message}")
                     } else {
-                        Log.d("send", "transaction successful, hash: ${transactionResponse.transactionHash}")
                         transactionResponse.transactionHash
                     }
                 }
@@ -200,12 +195,10 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
         return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
             // Return the cached balances if they are still valid
-            Log.d("newGetTokens", "using cached Balances $cachedBalances")
             cachedBalances
         } else {
             // Fetch the balances from the network and update the cache
             val web3jService = Web3jService.build(selectedNetwork)
-            Log.d("newGetTokens", "Making network calls")
 
             val mnemonic = getMnemonic()
             val credentials = if (!mnemonic.isNullOrEmpty()) {

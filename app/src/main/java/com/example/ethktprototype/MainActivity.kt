@@ -1,7 +1,6 @@
 package com.example.ethktprototype
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +27,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
             val isWalletMnemonicInPrefs = viewModel.mnemonicLoaded.value
-            Log.d("MainActi", "${viewModel.mnemonicLoaded.value}")
             val startPoint = if (!isWalletMnemonicInPrefs) "mainScreen" else "tokenList"
 
             EthKtPrototypeTheme {

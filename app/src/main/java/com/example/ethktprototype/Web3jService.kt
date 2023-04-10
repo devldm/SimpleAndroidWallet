@@ -1,6 +1,5 @@
 package com.example.ethktprototype
 
-import android.util.Log
 import com.example.ethktprototype.Web3jService.env
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService
@@ -10,7 +9,6 @@ object Web3jService {
     val env = EnvVars()
 
     fun build(selectedNetwork: Network): Web3j {
-        Log.d("web3j", selectedNetwork.url)
         return Web3j.build(HttpService(selectedNetwork.url))
     }
 

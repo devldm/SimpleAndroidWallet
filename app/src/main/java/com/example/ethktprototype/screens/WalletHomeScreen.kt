@@ -2,7 +2,6 @@ package com.example.ethktprototype.screens
 
 import NetworkDropdown
 import android.app.Application
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -77,9 +76,6 @@ fun TokenListScreen(
 
     LaunchedEffect(viewModel.selectedNetwork.value) {
         if(initialSelectedNetwork != viewModel.selectedNetwork.value) {
-            Log.d(
-                "getTokens",
-                "rerunning on network change, fetching ${viewModel.selectedNetwork} data")
             viewModel.getTokens(application)
         }
     }

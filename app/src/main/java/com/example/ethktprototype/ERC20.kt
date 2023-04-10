@@ -42,7 +42,6 @@ class ERC20(
     }
 
     fun balanceOf(address: String): BigInteger {
-        Log.d("TokenListScreen", "Calling balanceOf function for address $address")
         val function = Function(
             "balanceOf", listOf(Address(address)), listOf(object : TypeReference<Type<*>>() {})
         )
