@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.ethktprototype.screens.MyMainScreen
+import com.example.ethktprototype.screens.SettingsScreen
 import com.example.ethktprototype.screens.TokenListScreen
 import com.example.ethktprototype.ui.theme.EthKtPrototypeTheme
 
@@ -40,6 +41,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("tokenList") {
                             TokenListScreen(navController, viewModel, application)
+                        }
+                        composable("settingsScreen") {
+                            SettingsScreen(navController = navController, viewModel = viewModel)
                         }
                     }
                 }
