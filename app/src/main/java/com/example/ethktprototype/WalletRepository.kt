@@ -11,6 +11,9 @@ import androidx.core.content.edit
 import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
@@ -61,8 +64,15 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
     fun updateSelectedNetwork(network: Network): Network {
         selectedNetwork.value = network
-        sharedPreferences.edit().putString("SELECTED_NETWORK_NAME", network.displayName).apply()
+        val jsonNetwork = Json.encodeToString(network)
+        sharedPreferences.edit().putString("SELECTED_NETWORK_NAME", jsonNetwork).apply()
         return network
+    }
+
+    override fun getLastSelectedNetwork(): Network {
+        val json = sharedPreferences.getString("SELECTED_NETWORK_NAME", null)
+        val jsonReturn = json?.let { Json.decodeFromString<Network>(it) }
+        return jsonReturn ?: Network.MUMBAI_TESTNET
     }
 
     fun storeWallet(walletAddress: String) {

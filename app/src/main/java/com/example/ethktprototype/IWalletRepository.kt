@@ -22,6 +22,8 @@ interface IWalletRepository {
 
     fun loadMnemonicFromPrefs(): String?
 
+    fun getLastSelectedNetwork(): Network
+
     fun getMnemonic(): String?
 
     suspend fun sendTokens(

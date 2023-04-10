@@ -19,6 +19,7 @@ import androidx.navigation.NavHostController
 import com.example.ethktprototype.Network
 import com.example.ethktprototype.WalletViewModel
 import com.example.ethktprototype.composables.*
+import com.example.ethktprototype.getUserBalances
 import utils.loadBip44Credentials
 import java.math.BigDecimal
 
@@ -78,6 +79,8 @@ fun TokenListScreen(
         if(initialSelectedNetwork != viewModel.selectedNetwork.value) {
             viewModel.getTokens(application)
         }
+        viewModel.currentNetworkBalances.value = getUserBalances(application, selectedNetwork = viewModel.selectedNetwork.value.displayName)
+        viewModel.selectedToken.value = viewModel.currentNetworkBalances.value.firstOrNull()
     }
 
     LazyColumn(

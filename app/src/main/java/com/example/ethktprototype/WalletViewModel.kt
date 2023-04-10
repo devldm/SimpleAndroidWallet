@@ -3,7 +3,6 @@ package com.example.ethktprototype
 import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
@@ -29,13 +28,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         get() = _walletAddress
 
 
-    private val _selectedNetwork = mutableStateOf(Network.MUMBAI_TESTNET)
+    private val _selectedNetwork = mutableStateOf(walletRepository.getLastSelectedNetwork())
     val selectedNetwork: MutableState<Network> = _selectedNetwork
 
-    private val currentNetworkBalances = getUserBalances(application, selectedNetwork = selectedNetwork.value.displayName )
+    private val _currentNetworkBalances = mutableStateOf(getUserBalances(application, selectedNetwork = selectedNetwork.value.displayName ))
+    val currentNetworkBalances: MutableState<List<TokenBalance>> = _currentNetworkBalances
 
-    private val _selectedToken = mutableStateOf(currentNetworkBalances?.firstOrNull())
-    val selectedToken: State<TokenBalance?> = _selectedToken
+    private val _selectedToken = mutableStateOf(currentNetworkBalances.value.firstOrNull())
+    val selectedToken: MutableState<TokenBalance?> = _selectedToken
 
     var hash = MutableLiveData<String>()
 
@@ -43,7 +43,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _selectedToken.value = token
     }
 
-    val selectedNetworkPreference = sharedPreferences.edit().putString("SELECTED_NETWORK_NAME", _selectedNetwork.value.displayName).apply()
 
     private var _mnemonicLoaded = mutableStateOf(false)
     var mnemonicLoaded: MutableState<Boolean> = _mnemonicLoaded
@@ -91,6 +90,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             withContext(Dispatchers.IO) {
                 val balances = walletRepo.getTokens(walletAddress!!, getTokenContractAddresses(selectedNetwork.value), selectedNetwork.value)
                 tokens.postValue(balances)
+                currentNetworkBalances.value = balances
+                selectedToken.value = currentNetworkBalances.value.firstOrNull()
             }
             loading.value = false
         }
