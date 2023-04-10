@@ -83,6 +83,10 @@ class WalletRepository(private val application: Application) : IWalletRepository
         }
     }
 
+    override fun removeAllWalletData() {
+        sharedPreferences.edit().clear().commit()
+    }
+
     override fun getMnemonic(): String? {
         // Decrypt the mnemonic
         return getDecryptedMnemonic(context)

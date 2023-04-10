@@ -24,6 +24,8 @@ interface IWalletRepository {
 
     fun getLastSelectedNetwork(): Network
 
+    fun removeAllWalletData()
+
     fun getMnemonic(): String?
 
     suspend fun sendTokens(

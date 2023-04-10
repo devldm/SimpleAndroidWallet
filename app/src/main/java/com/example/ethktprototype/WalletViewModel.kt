@@ -75,6 +75,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         mnemonicLoaded.value = storedMnemonic != null
     }
 
+    fun removeAllWalletData(){
+        walletRepository.removeAllWalletData()
+        mnemonicLoaded.value = false
+    }
+
     fun updateSelectedNetwork(network: Network) {
         val network = walletRepository.updateSelectedNetwork(network)
         _selectedNetwork.value = network

@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -89,6 +91,21 @@ fun TokenListScreen(
             .fillMaxHeight(),
         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 16.dp)
     ) {
+        item{
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp, 0.dp)
+            ) {
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    modifier = Modifier.size(20.dp),
+                    onClick = { navController.navigate("settingsScreen")}
+                ) {
+                    Icon(
+                        Icons.Filled.Settings,
+                        "contentDescription",
+                    )
+                }
+        }}
         item {
             Column(
                 modifier = Modifier
