@@ -9,6 +9,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import androidx.lifecycle.MutableLiveData
+import io.sentry.Sentry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -22,7 +23,6 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.TransactionEncoder
-import org.web3j.crypto.WalletUtils
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
@@ -30,6 +30,7 @@ import org.web3j.tx.Transfer
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.utils.Convert
 import org.web3j.utils.Numeric
+import utils.loadBip44Credentials
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.HttpURLConnection
@@ -84,7 +85,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
     }
 
     override fun removeAllWalletData() {
-        sharedPreferences.edit().clear().commit()
+        sharedPreferences.edit().clear().apply()
     }
 
     override fun getMnemonic(): String? {
@@ -191,6 +192,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
             } catch (e: Exception) {
                 Log.e("send", "transaction failed: ${e.message}")
+                Sentry.captureException(e)
                 throw e
             }
         }
@@ -216,7 +218,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
             val mnemonic = getMnemonic()
             val credentials = if (!mnemonic.isNullOrEmpty()) {
-                WalletUtils.loadBip39Credentials(null, mnemonic)
+                loadBip44Credentials(mnemonic)
             } else {
                 null
             }
@@ -266,6 +268,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
                         "Tokens",
                         "Error fetching token balance for $address: ${e.message}"
                     )
+                    Sentry.captureException(e)
                     null
                 }
             }

@@ -2,7 +2,12 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
+    id "io.sentry.android.gradle" version "3.5.0"
 }
+
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
+def sentryDsn = properties.getProperty('sentry.dsn')
 
 android {
     namespace 'com.example.ethktprototype'
@@ -12,8 +17,10 @@ android {
         applicationId "com.mingo.simpleWallet"
         minSdk 29
         targetSdk 33
-        versionCode 6
-        versionName "1.5"
+        versionCode 7
+        versionName "1.6"
+
+        manifestPlaceholders = [sentryDsn: sentryDsn]
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
