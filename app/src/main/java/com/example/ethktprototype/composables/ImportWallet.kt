@@ -9,11 +9,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.ethktprototype.WalletViewModel
+import io.sentry.Sentry
 import utils.isValidMnemonic
 import utils.loadBip44Credentials
 
@@ -78,6 +78,7 @@ fun ImportWallet(
                             viewModel.storeMnemonic(mnemonic)
                         } catch (e: Exception) {
                             errorMessage = "Failed to import wallet: ${e.message}"
+                            Sentry.captureException(e)
                         }
                     } else {
                         errorMessage = "Invalid mnemonic"
