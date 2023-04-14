@@ -32,7 +32,7 @@ fun TokenListScreen(
     viewModel: WalletViewModel,
     application: Application
 ) {
-    val walletAddress = viewModel.walletAddress.value // Replace with the actual wallet address
+    val walletAddress = viewModel.walletAddress.value
     val networks = remember { Network.values().toList() }
     val tokensState = viewModel.getTokens(application)
     val tokens by tokensState.observeAsState(emptyList())
@@ -153,6 +153,8 @@ fun TokenListScreen(
 
             if (showSuccessModal) {
                 SuccessDialogModal(value = sentAmount.toString(),
+                    network = viewModel.selectedNetwork.value,
+                    hash = viewModel.hash.value ?: "",
                     address = toAddress,
                     sentCurrency = sentCurrency,
                     onDismiss = { showSuccessModal = false; viewModel.hash = MutableLiveData("") })
