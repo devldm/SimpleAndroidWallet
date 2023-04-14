@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -32,21 +33,21 @@ fun PayDialog(
         Surface(
             modifier = Modifier
                 .padding(16.dp)
-                .height(450.dp),
-
+                .heightIn(400.dp),
             shape = RoundedCornerShape(16.dp),
             tonalElevation = 8.dp,
 
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Pay", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "Pay", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = toAddress,
                         onValueChange = { toAddress = it },
                         label = { Text("To Address") },
                         modifier = Modifier.weight(1f),
+                        maxLines = 3,
                     )
                     BarcodeScanner(onScanResult = {result -> toAddress =result})
                 }

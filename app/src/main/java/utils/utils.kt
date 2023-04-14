@@ -5,6 +5,13 @@ import org.web3j.crypto.Bip32ECKeyPair
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.MnemonicUtils
 
+fun buildScanUrl(network: Network, hash: String): String {
+    if(network.chainId == Network.MUMBAI_TESTNET.chainId)  {
+        return "https://mumbai.polygonscan.com/tx/${hash}"
+    }
+    return "https://polygonscan.com/tx/${hash}"
+}
+
 fun getTokenContractAddresses(selectedNetwork: Network): List<String> {
     if(selectedNetwork.chainId == Network.MUMBAI_TESTNET.chainId) {
         return listOf(
