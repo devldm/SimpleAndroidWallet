@@ -15,7 +15,8 @@ data class TokenBalance(
     val contractAddress: String,
     @Contextual val balance: String,
     val name: String,
-    val symbol: String
+    val symbol: String,
+    val tokenIcon: String
 )
 
 fun getBalancesSharedPreferences(application: Application): SharedPreferences {

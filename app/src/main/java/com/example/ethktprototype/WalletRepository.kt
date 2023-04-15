@@ -15,6 +15,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
@@ -23,14 +26,13 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.TransactionEncoder
-import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.tx.Transfer
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.utils.Convert
 import org.web3j.utils.Numeric
-import utils.loadBip44Credentials
+import utils.encodeBase64
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.HttpURLConnection
@@ -115,7 +117,78 @@ class WalletRepository(private val application: Application) : IWalletRepository
         }
     }
 
-    override suspend fun sendTokens(credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal): String {
+    override fun fetchBalances(
+        chainName: String,
+        walletAddress: String,
+        selectedNetwork: Network
+    ): List<TokenBalance> {
+        val currentTime = System.currentTimeMillis() / 1000
+        val sharedPreferences = getBalancesSharedPreferences(application)
+        val cacheExpirationTime = getCacheExpirationTime(sharedPreferences)
+        val cachedBalances = getUserBalances(application, selectedNetwork.displayName)
+        val envVars = EnvVars()
+
+        return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
+            // Return the cached balances if they are still valid
+            Log.d("fetchBalances", "Returning cached balances")
+            cachedBalances
+        } else {
+            val url =
+                "https://api.covalenthq.com/v1/${chainName}/address/${walletAddress}/balances_v2/"
+            val request = Request.Builder()
+                .url(url)
+                .header("accept", "application/json")
+                .header(
+                    "Authorization",
+                    "Basic " + "${envVars.covalentAPI}".toByteArray().encodeBase64()
+                )
+                .build()
+
+            val client = OkHttpClient()
+            val response: Response = client.newCall(request).execute()
+
+            val json = response.body?.string()
+            val covalentResponse = json?.let { Json.decodeFromString<CovalentResponse>(it) }
+
+            val items = covalentResponse?.data?.items
+
+            val balances = items?.mapNotNull { item ->
+                Log.d("fetchBalances", "$item")
+
+                try {
+                    item.logo_url?.let {
+                        TokenBalance(
+                            item.contract_address,
+                            item.balance,
+                            item.contract_name,
+                            item.contract_ticker_symbol,
+                            it
+
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("fetchBalances", "$e")
+                    Sentry.captureException(e)
+                }
+
+            }
+            cacheUserBalance(
+                balances as List<TokenBalance>,
+                application,
+                selectedNetwork.displayName
+            )
+            // Update the cache expiration time
+            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime).apply()
+            return balances
+        }
+    }
+
+    override suspend fun sendTokens(
+        credentials: Credentials,
+        contractAddress: String,
+        toAddress: String,
+        value: BigDecimal
+    ): String {
         val web3jService = Web3jService.build(selectedNetwork.value)
         val contract = ERC20.load(contractAddress, web3jService, credentials, DefaultGasProvider())
         val decimals = contract.decimals()
@@ -123,10 +196,21 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
         val function = Function(
             "transfer",
-            listOf(Address(toAddress), Uint256(Convert.toWei(value.multiply(BigDecimal.TEN.pow(decimals.toInt())), Convert.Unit.WEI).toBigInteger())),
+            listOf(
+                Address(toAddress),
+                Uint256(
+                    Convert.toWei(
+                        value.multiply(BigDecimal.TEN.pow(decimals.toInt())),
+                        Convert.Unit.WEI
+                    ).toBigInteger()
+                )
+            ),
             emptyList()
         )
-        val nonce: BigInteger = web3jService.ethGetTransactionCount(credentials.address, DefaultBlockParameterName.LATEST)
+        val nonce: BigInteger = web3jService.ethGetTransactionCount(
+            credentials.address,
+            DefaultBlockParameterName.LATEST
+        )
             .send().transactionCount
 
         // Encode the function call to get the data that needs to be sent in the transaction
@@ -146,19 +230,22 @@ class WalletRepository(private val application: Application) : IWalletRepository
         return withContext(Dispatchers.IO) {
             try {
 
-                if(contractAddress == "0x0000000000000000000000000000000000001010") {
+                if (contractAddress == "0x0000000000000000000000000000000000001010") {
                     val transfer = Transfer.sendFundsEIP1559(
                         web3jService,
                         credentials,
                         toAddress,
-                        Convert.toWei(value.multiply(BigDecimal.TEN.pow(decimals.toInt())), Convert.Unit.WEI),
+                        Convert.toWei(
+                            value.multiply(BigDecimal.TEN.pow(decimals.toInt())),
+                            Convert.Unit.WEI
+                        ),
                         Convert.Unit.WEI,
                         gasLimit,
                         maxPriorityFeeWei,
                         maxFeeWei
                     ).sendAsync().get()
 
-                    if(transfer.isStatusOK) {
+                    if (transfer.isStatusOK) {
                         transfer.transactionHash
                     } else {
                         throw RuntimeException("EIP1559 Transaction failed: ${transfer.logs}")
@@ -174,13 +261,18 @@ class WalletRepository(private val application: Application) : IWalletRepository
                     )
 
                     // my attempt to fix only EIP allowed over RPC
-                    val signedT = TransactionEncoder.signMessage(transaction, selectedNetwork.value.chainId, credentials)
+                    val signedT = TransactionEncoder.signMessage(
+                        transaction,
+                        selectedNetwork.value.chainId,
+                        credentials
+                    )
 
                     // Convert the signed transaction to hex format
                     val hexValue = Numeric.toHexString(signedT)
 
                     // Send the signed transaction to the network
-                    val transactionResponse = web3jService.ethSendRawTransaction(hexValue).sendAsync().get()
+                    val transactionResponse =
+                        web3jService.ethSendRawTransaction(hexValue).sendAsync().get()
 
                     // Check if the transaction was successful or not
                     if (transactionResponse.hasError()) {
@@ -194,83 +286,6 @@ class WalletRepository(private val application: Application) : IWalletRepository
                 Log.e("send", "transaction failed: ${e.message}")
                 Sentry.captureException(e)
                 throw e
-            }
-        }
-    }
-
-
-    override suspend fun getTokens(
-        walletAddress: String,
-        contractAddresses: List<String>,
-        selectedNetwork: Network
-    ): List<TokenBalance> {
-        val currentTime = System.currentTimeMillis() / 1000
-        val sharedPreferences = getBalancesSharedPreferences(application)
-        val cacheExpirationTime = getCacheExpirationTime(sharedPreferences)
-        val cachedBalances = getUserBalances(application, selectedNetwork.displayName)
-
-        return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
-            // Return the cached balances if they are still valid
-            cachedBalances
-        } else {
-            // Fetch the balances from the network and update the cache
-            val web3jService = Web3jService.build(selectedNetwork)
-
-            val mnemonic = getMnemonic()
-            val credentials = if (!mnemonic.isNullOrEmpty()) {
-                loadBip44Credentials(mnemonic)
-            } else {
-                null
-            }
-
-            val balances = withContext(Dispatchers.IO) {
-                val tokenBalances =
-                    getTokenBalances(walletAddress, contractAddresses, web3jService, credentials)
-                cacheUserBalance(tokenBalances, application, selectedNetwork.displayName)
-                tokenBalances
-            }
-
-            // Update the cache expiration time
-            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime).apply()
-
-            balances
-        }
-    }
-
-    override fun getTokenBalances(
-        walletAddress: String,
-        contractAddresses: List<String>,
-        web3j: Web3j,
-        credentials: Credentials?
-    ): List<TokenBalance> {
-        return contractAddresses.mapNotNull { address ->
-            try {
-                val contract = ERC20.load(address, web3j, credentials!!, DefaultGasProvider())
-                val balance = contract.balanceOf(walletAddress)
-                if (balance == BigInteger.valueOf(0)) {
-                    null // Skip this token if balance is 0
-                } else {
-                    TokenBalance(
-                        address,
-                        balance.toString(),
-                        contract.name(),
-                        contract.symbol()
-                    )
-                }
-            } catch (e: Exception) {
-                if (e.message?.contains("Invalid BigInteger") == true) {
-                    // Handle "Invalid BigInteger" error
-                    Log.e("Tokens", "Invalid BigInteger for $address: ${e.message}")
-                    null
-                } else {
-                    // Log other errors and continue processing
-                    Log.e(
-                        "Tokens",
-                        "Error fetching token balance for $address: ${e.message}"
-                    )
-                    Sentry.captureException(e)
-                    null
-                }
             }
         }
     }

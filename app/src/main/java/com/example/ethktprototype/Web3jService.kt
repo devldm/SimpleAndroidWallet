@@ -14,9 +14,24 @@ object Web3jService {
 
 }
 
-enum class Network(val displayName: String, val url: String, val chainId: Long) {
-    POLYGON_MAINNET("Polygon", "https://polygon-mainnet.infura.io/v3/${env.infuraApiKey}", 137),
-    MUMBAI_TESTNET("Mumbai Testnet", "https://polygon-mumbai.infura.io/v3/${env.infuraApiKey}",80001)
+enum class Network(
+    val displayName: String,
+    val url: String,
+    val chainId: Long,
+    val covalentChainName: String
+) {
+    POLYGON_MAINNET(
+        "Polygon",
+        "https://polygon-mainnet.infura.io/v3/${env.infuraApiKey}",
+        137,
+        covalentChainName = "matic-mainnet"
+    ),
+    MUMBAI_TESTNET(
+        "Mumbai Testnet",
+        "https://polygon-mumbai.infura.io/v3/${env.infuraApiKey}",
+        80001,
+        covalentChainName = "matic-mumbai"
+    )
 }
 
 

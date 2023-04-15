@@ -12,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.web3j.crypto.Credentials
-import utils.getTokenContractAddresses
 import java.math.BigDecimal
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
@@ -20,7 +19,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val sharedPreferences =
         application.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
     private val walletAddressKey = "wallet_address"
-
 
 
     private val _walletAddress = MutableLiveData<String>()
@@ -31,7 +29,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _selectedNetwork = mutableStateOf(walletRepository.getLastSelectedNetwork())
     val selectedNetwork: MutableState<Network> = _selectedNetwork
 
-    private val _currentNetworkBalances = mutableStateOf(getUserBalances(application, selectedNetwork = selectedNetwork.value.displayName ))
+    private val _currentNetworkBalances = mutableStateOf(
+        getUserBalances(
+            application, selectedNetwork = selectedNetwork.value.displayName
+        )
+    )
     val currentNetworkBalances: MutableState<List<TokenBalance>> = _currentNetworkBalances
 
     private val _selectedToken = mutableStateOf(currentNetworkBalances.value.firstOrNull())
@@ -75,7 +77,28 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         mnemonicLoaded.value = storedMnemonic != null
     }
 
-    fun removeAllWalletData(){
+    fun getBalances(): MutableLiveData<List<TokenBalance>> {
+        val tokens = MutableLiveData<List<TokenBalance>>()
+        loading.value = true
+        val walletAddress = walletAddress.value
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val tokenBalances = walletRepository.fetchBalances(
+                    selectedNetwork.value.covalentChainName,
+                    walletAddress!!,
+                    selectedNetwork.value
+                )
+                tokens.postValue(tokenBalances)
+                currentNetworkBalances.value = tokenBalances
+                selectedToken.value = currentNetworkBalances.value.firstOrNull()
+            }
+            loading.value = false
+        }
+        return tokens
+    }
+
+    fun removeAllWalletData() {
         walletRepository.removeAllWalletData()
         mnemonicLoaded.value = false
     }
@@ -85,30 +108,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _selectedNetwork.value = network
     }
 
-    fun getTokens(application: Application): LiveData<List<TokenBalance>> {
-        val walletRepo = WalletRepository(application)
-        val tokens = MutableLiveData<List<TokenBalance>>()
-        loading.value = true
-        val walletAddress = walletAddress.value
-
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val balances = walletRepo.getTokens(walletAddress!!, getTokenContractAddresses(selectedNetwork.value), selectedNetwork.value)
-                tokens.postValue(balances)
-                currentNetworkBalances.value = balances
-                selectedToken.value = currentNetworkBalances.value.firstOrNull()
-            }
-            loading.value = false
-        }
-        return tokens
-    }
-
-    fun sendTokens(credentials: Credentials, contractAddress: String, toAddress: String,
-                   value: BigDecimal
+    fun sendTokens(
+        credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal
     ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-               val returnedHash = walletRepository.sendTokens(
+                val returnedHash = walletRepository.sendTokens(
                     credentials, contractAddress, toAddress, value
                 )
                 hash.postValue(returnedHash)

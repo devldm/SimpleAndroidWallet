@@ -70,6 +70,7 @@ fun ImportWallet(
             Button(
                 onClick = {
                     if (isValidMnemonic(mnemonic)) {
+                        mnemonic = mnemonic.trim()
                         try {
                             // TODO: See if other wallets work with Bip44
                             //val wallet = WalletUtils.loadBip39Credentials("", mnemonic)
