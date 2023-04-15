@@ -13,11 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.MutableLiveData
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 import com.example.ethktprototype.Network
 import com.example.ethktprototype.WalletViewModel
 import com.example.ethktprototype.composables.*
@@ -34,7 +36,7 @@ fun TokenListScreen(
 ) {
     val walletAddress = viewModel.walletAddress.value
     val networks = remember { Network.values().toList() }
-    val tokensState = viewModel.getTokens(application)
+    val tokensState = viewModel.getBalances()
     val tokens by tokensState.observeAsState(emptyList())
     val hashState = viewModel.hash.observeAsState()
     var hash by remember { mutableStateOf("") }
@@ -78,10 +80,13 @@ fun TokenListScreen(
     }
 
     LaunchedEffect(viewModel.selectedNetwork.value) {
-        if(initialSelectedNetwork != viewModel.selectedNetwork.value) {
-            viewModel.getTokens(application)
+        if (initialSelectedNetwork != viewModel.selectedNetwork.value) {
+            viewModel.getBalances()
         }
-        viewModel.currentNetworkBalances.value = getUserBalances(application, selectedNetwork = viewModel.selectedNetwork.value.displayName)
+        viewModel.currentNetworkBalances.value = getUserBalances(
+            application,
+            selectedNetwork = viewModel.selectedNetwork.value.displayName
+        )
         viewModel.selectedToken.value = viewModel.currentNetworkBalances.value.firstOrNull()
     }
 
@@ -91,21 +96,24 @@ fun TokenListScreen(
             .fillMaxHeight(),
         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 16.dp)
     ) {
-        item{
+        item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp, 0.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp, 0.dp)
             ) {
                 Spacer(Modifier.weight(1f))
                 IconButton(
                     modifier = Modifier.size(20.dp),
-                    onClick = { navController.navigate("settingsScreen")}
+                    onClick = { navController.navigate("settingsScreen") }
                 ) {
                     Icon(
                         Icons.Filled.Settings,
                         "contentDescription",
                     )
                 }
-        }}
+            }
+        }
         item {
             Column(
                 modifier = Modifier
@@ -215,36 +223,56 @@ fun TokenListScreen(
                             .fillMaxWidth()
                             .padding(vertical = 2.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                                .clickable(onClick = {
-                                    // TODO: Handle click on token
-                                })
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    t.symbol,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                                )
-
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = t.name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
+                            Box(
+                                modifier = Modifier.size(50.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AsyncImage(
+                                    model = t.tokenIcon,
+                                    contentDescription = "Token Icon",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .size(45.dp)
+                                        .padding(start = 10.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Balance: $formatBalance",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 8.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)
+                                    .clickable(onClick = {
+                                        // TODO: Handle click on token
+                                    })
+                            ) {
+
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        t.symbol,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = t.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Balance: $formatBalance",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
                 }
