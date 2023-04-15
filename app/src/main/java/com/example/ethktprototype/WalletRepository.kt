@@ -218,7 +218,8 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
         val ethEstimateGas = web3jService.ethEstimateGas(
             Transaction.createFunctionCallTransaction(
-                credentials.address, nonce, gasPrice, null, toAddress, encodedFunction
+                //TODO: Fix this line causing errors - testing using burn address here for now
+                "0x000000000000000000000000000000000000dEaD", nonce, gasPrice, null, "0x000000000000000000000000000000000000dEaD", encodedFunction
             )
         ).send()
 
