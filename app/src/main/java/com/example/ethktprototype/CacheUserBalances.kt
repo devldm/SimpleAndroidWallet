@@ -16,6 +16,7 @@ data class TokenBalance(
     @Contextual val balance: String,
     val name: String,
     val symbol: String,
+    val decimals: Int,
     val tokenIcon: String
 )
 

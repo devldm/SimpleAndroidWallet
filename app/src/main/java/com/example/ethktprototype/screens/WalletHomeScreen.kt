@@ -17,15 +17,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.MutableLiveData
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.ethktprototype.Network
 import com.example.ethktprototype.WalletViewModel
 import com.example.ethktprototype.composables.*
 import com.example.ethktprototype.getUserBalances
-import utils.loadBip44Credentials
 import java.math.BigDecimal
+import java.text.DecimalFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,38 +40,11 @@ fun TokenListScreen(
     val hashState = viewModel.hash.observeAsState()
     var hash by remember { mutableStateOf("") }
     val initialSelectedNetwork = remember { viewModel.selectedNetwork.value }
-    var showPayDialog by remember { mutableStateOf(false) }
+    var showPayDialog = viewModel.showPayDialog.observeAsState()
     var showWalletModal by remember { mutableStateOf(false) }
     var showSuccessModal by remember { mutableStateOf(false) }
+    val decimalFormatBalance = DecimalFormat("#.#######")
 
-
-    var toAddress by remember {
-        mutableStateOf("")
-    }
-    var sentAmount by remember {
-        mutableStateOf(0.0)
-    }
-    var sentCurrency by remember {
-        mutableStateOf("")
-    }
-
-
-    fun onPayConfirmed(address: String, amount: Double, contractAddress: String) {
-        val mnemonic = viewModel.getMnemonic()
-        toAddress = address
-        sentAmount = amount
-        sentCurrency = viewModel.selectedToken.value?.symbol ?: ""
-
-        if (!mnemonic.isNullOrEmpty()) {
-            val credentials = loadBip44Credentials(mnemonic)
-            credentials.let {
-                viewModel.sendTokens(
-                    credentials, contractAddress, address, BigDecimal.valueOf(amount)
-                )
-                showPayDialog = false
-            }
-        }
-    }
 
     if (!hashState.value.isNullOrEmpty() && hash != hashState.value) {
         showSuccessModal = true
@@ -144,12 +116,11 @@ fun TokenListScreen(
                 selectedNetwork = viewModel.selectedNetwork,
                 updateSelectedNetwork = { viewModel.updateSelectedNetwork(it) })
             Spacer(modifier = Modifier.height(8.dp))
-
         }
 
         item {
-            MyRow(showPayDialog,
-                setShowPayDialog = { showPayDialog = it },
+            MyRow(viewModel.showPayDialog.value!!,
+                setShowPayDialog = { viewModel.showPayDialog.value = it },
                 showWalletModal,
                 setShowWalletModal = { showWalletModal = it })
             Spacer(modifier = Modifier.height(16.dp))
@@ -160,20 +131,21 @@ fun TokenListScreen(
             }
 
             if (showSuccessModal) {
-                SuccessDialogModal(value = sentAmount.toString(),
+                SuccessDialogModal(
+                    value = decimalFormatBalance.format(viewModel.sentAmount.value).toString(),
                     network = viewModel.selectedNetwork.value,
                     hash = viewModel.hash.value ?: "",
-                    address = toAddress,
-                    sentCurrency = sentCurrency,
-                    onDismiss = { showSuccessModal = false; viewModel.hash = MutableLiveData("") })
+                    address = viewModel.toAddress.value,
+                    sentCurrency = viewModel.sentCurrency.value,
+                    onDismiss = { showSuccessModal = false; viewModel.hash.value = "" })
             }
 
             // show the pay dialog if the state variable is true
-            if (showPayDialog) {
+            if (showPayDialog.value == true) {
                 PayDialog(
-                    onDismiss = { showPayDialog = false },
+                    onDismiss = { viewModel.showPayDialog.value = false },
                     onPay = { address, amount, contractAddress ->
-                        onPayConfirmed(
+                        viewModel.onPayConfirmed(
                             address,
                             amount.toDouble(),
                             contractAddress
@@ -206,8 +178,8 @@ fun TokenListScreen(
         } else {
             items(tokens.size) { token ->
                 val t = tokens[token]
-                val balanceInEth = t.balance.toBigDecimal().divide(BigDecimal.TEN.pow(18))
-                val formatBalance = balanceInEth?.let { String.format("%.4f", it) } ?: "N/A"
+                val balanceInEth = t.balance.toBigDecimal().divide(BigDecimal.TEN.pow(t.decimals))
+                val formattedBalance = decimalFormatBalance.format(balanceInEth) ?: "N/A"
 
                 Column(
                     modifier = Modifier
@@ -268,7 +240,7 @@ fun TokenListScreen(
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Balance: $formatBalance",
+                                    text = "Balance: $formattedBalance",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                                 )

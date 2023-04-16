@@ -162,6 +162,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
                             item.balance,
                             item.contract_name,
                             item.contract_ticker_symbol,
+                            item.contract_decimals,
                             it
 
                         )
