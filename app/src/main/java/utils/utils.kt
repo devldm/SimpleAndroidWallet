@@ -2,9 +2,23 @@ package utils
 
 import android.util.Base64
 import com.example.ethktprototype.Network
+import com.example.ethktprototype.Web3jService
 import org.web3j.crypto.Bip32ECKeyPair
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.MnemonicUtils
+import org.web3j.ens.EnsResolver
+
+fun ensResolver(ensName: String): String {
+    return if (!ensName.contains(".eth")) {
+        ensName
+    } else {
+        val web3jService = Web3jService.build(Network.ETH_MAINNET)
+        val ensResolve = EnsResolver(web3jService)
+
+        ensResolve.resolve(ensName)
+    }
+}
+
 
 fun buildScanUrl(network: Network, hash: String): String {
     if (network.chainId == Network.MUMBAI_TESTNET.chainId) {

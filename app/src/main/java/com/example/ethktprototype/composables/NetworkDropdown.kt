@@ -47,7 +47,7 @@ fun NetworkDropdown(
                 expanded = expanded.value,
                 onDismissRequest = { expanded.value = false },
             ) {
-                networks.forEach { network ->
+                networks.filterNot { it == Network.ETH_MAINNET }.forEach { network ->
                     DropdownMenuItem(
                         onClick = {
                             updateSelectedNetwork(network)

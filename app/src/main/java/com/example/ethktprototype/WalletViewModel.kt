@@ -12,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.web3j.crypto.Credentials
+import utils.ensResolver
+import utils.loadBip44Credentials
 import java.math.BigDecimal
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
@@ -19,7 +21,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val sharedPreferences =
         application.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
     private val walletAddressKey = "wallet_address"
-
 
     private val _walletAddress = MutableLiveData<String>()
     val walletAddress: LiveData<String>
@@ -50,6 +51,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     var mnemonicLoaded: MutableState<Boolean> = _mnemonicLoaded
 
     val loading = mutableStateOf(true)
+
+    var toAddress = mutableStateOf("")
+
+    var sentAmount = mutableStateOf(0.0)
+
+    var sentCurrency = mutableStateOf("")
+
+    var showPayDialog = MutableLiveData(false)
+
 
     init {
         // Load the wallet address from SharedPreferences when the ViewModel is created
@@ -106,6 +116,28 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun updateSelectedNetwork(network: Network) {
         val network = walletRepository.updateSelectedNetwork(network)
         _selectedNetwork.value = network
+    }
+
+    fun onPayConfirmed(address: String, amount: Double, contractAddress: String) {
+        val mnemonic = getMnemonic()
+        sentAmount.value = amount
+        sentCurrency.value = selectedToken.value?.symbol ?: ""
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO){
+                toAddress.value = ensResolver(address)
+
+                if (!mnemonic.isNullOrEmpty()) {
+                    val credentials = loadBip44Credentials(mnemonic)
+                    credentials.let {
+                        sendTokens(
+                            credentials, contractAddress, toAddress.value, BigDecimal.valueOf(amount)
+                        )
+                        showPayDialog.postValue(false)
+                    }
+                }
+            }
+        }
     }
 
     fun sendTokens(

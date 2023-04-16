@@ -31,6 +31,12 @@ enum class Network(
         "https://polygon-mumbai.infura.io/v3/${env.infuraApiKey}",
         80001,
         covalentChainName = "matic-mumbai"
+    ),
+    ETH_MAINNET(
+    "Ethereum",
+    "https://mainnet.infura.io/v3/${env.infuraApiKey}",
+    1,
+    covalentChainName = "eth-mainnet"
     )
 }
 
