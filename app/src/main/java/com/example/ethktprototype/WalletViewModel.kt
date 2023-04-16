@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.web3j.crypto.Credentials
+import utils.addressToEnsResolver
 import utils.ensResolver
 import utils.loadBip44Credentials
 import java.math.BigDecimal
@@ -59,6 +60,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     var sentCurrency = mutableStateOf("")
 
     var showPayDialog = MutableLiveData(false)
+
+    var userEnsName = MutableLiveData("")
 
 
     init {
@@ -136,6 +139,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         showPayDialog.postValue(false)
                     }
                 }
+            }
+        }
+    }
+
+    fun checkForEnsName(walletAddress: String?) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                var ens = walletAddress?.let { addressToEnsResolver(it) }
+                userEnsName.postValue(ens)
             }
         }
     }
