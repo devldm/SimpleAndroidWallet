@@ -30,6 +30,7 @@ fun BarcodeScanner(
     val options = ScanOptions()
     options.setPrompt("Scan a QR code")
     options.setOrientationLocked(false)
+    options.setBeepEnabled(false)
 
     IconButton(
         onClick = {

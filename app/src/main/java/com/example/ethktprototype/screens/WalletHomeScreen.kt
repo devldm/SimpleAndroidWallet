@@ -44,6 +44,8 @@ fun TokenListScreen(
     var showWalletModal by remember { mutableStateOf(false) }
     var showSuccessModal by remember { mutableStateOf(false) }
     val decimalFormatBalance = DecimalFormat("#.#######")
+    val ensState = viewModel.checkForEnsName(walletAddress)
+    val ens = viewModel.userEnsName.observeAsState()
 
 
     if (!hashState.value.isNullOrEmpty() && hash != hashState.value) {
@@ -107,6 +109,10 @@ fun TokenListScreen(
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
+                if(!ens.value.isNullOrEmpty()) {
+                    Text(text = "ens: ${ens.value}")
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }

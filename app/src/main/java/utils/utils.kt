@@ -19,6 +19,16 @@ fun ensResolver(ensName: String): String {
     }
 }
 
+fun addressToEnsResolver(address: String): String {
+    val web3jService = Web3jService.build(Network.ETH_MAINNET)
+    val ensResolve = EnsResolver(web3jService)
+    return try {
+        ensResolve.reverseResolve(address)
+    } catch (e: Exception) {
+        ""
+    }
+}
+
 
 fun buildScanUrl(network: Network, hash: String): String {
     if (network.chainId == Network.MUMBAI_TESTNET.chainId) {

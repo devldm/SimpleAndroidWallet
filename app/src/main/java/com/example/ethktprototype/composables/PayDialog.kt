@@ -43,8 +43,8 @@ fun PayDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
-                        value = toAddress,
-                        onValueChange = { toAddress = it },
+                        value = toAddress.lowercase(),
+                        onValueChange = { toAddress = it.lowercase() },
                         label = { Text("To Address") },
                         modifier = Modifier.weight(1f),
                         maxLines = 3,
@@ -60,6 +60,7 @@ fun PayDialog(
                     label = { Text("Amount") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -75,7 +76,7 @@ fun PayDialog(
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(
                         onClick = { viewModel.selectedToken.value?.let {
-                            onPay(toAddress, amount.toBigDecimal(),
+                            onPay(toAddress.lowercase().trim(), amount.toBigDecimal(),
                                 it.contractAddress)
                         } },
                         enabled = toAddress.isNotBlank() && amount.isNotBlank() && amount != "0",
