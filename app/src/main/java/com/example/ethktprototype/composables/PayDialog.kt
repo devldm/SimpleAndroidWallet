@@ -28,6 +28,10 @@ fun PayDialog(
 
     var toAddress by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("0") }
+    var tokensBlocked = rememberUpdatedState(newValue = viewModel.getTokenBlocklist())
+
+    val nonBlockedTokens: List<TokenBalance> =
+        tokens.filter { token -> !tokensBlocked.value.contains(token) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -52,7 +56,7 @@ fun PayDialog(
                     BarcodeScanner(onScanResult = {result -> toAddress =result})
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                TokenDropdown(tokens = tokens, selectedToken = viewModel.selectedToken.value, updateSelectedToken = {viewModel.updateSelectedToken(it)} )
+                TokenDropdown(tokens = nonBlockedTokens, selectedToken = viewModel.selectedToken.value, updateSelectedToken = {viewModel.updateSelectedToken(it)} )
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = amount,

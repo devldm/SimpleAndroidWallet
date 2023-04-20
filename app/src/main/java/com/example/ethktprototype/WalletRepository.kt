@@ -9,6 +9,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import androidx.lifecycle.MutableLiveData
+import com.google.common.reflect.TypeToken
 import io.sentry.Sentry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -95,6 +96,33 @@ class WalletRepository(private val application: Application) : IWalletRepository
         return getDecryptedMnemonic(context)
     }
 
+    override fun clearTokenBlocklist(): List<TokenBalance> {
+        sharedPreferences.edit().putString("TOKEN_BLOCKLIST", null).apply()
+        return getTokenBlocklist()
+    }
+
+    override fun updateTokenBlockList(tokenBlocklist: List<TokenBalance>) {
+        val jsonTokenBlocklist = Json.encodeToString(tokenBlocklist)
+        sharedPreferences.edit { putString("TOKEN_BLOCKLIST", jsonTokenBlocklist).apply() }
+    }
+
+    override fun getTokenBlocklist(): List<TokenBalance> {
+        val json = sharedPreferences.getString("TOKEN_BLOCKLIST", null)
+
+        return if (!json.isNullOrEmpty()) {
+            try {
+                val type = object : TypeToken<List<TokenBalance>>() {}.type
+                val jsonReturn = Json.decodeFromString<List<TokenBalance>>(json)
+                jsonReturn
+            } catch (e: Exception) {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+
+    }
+
     fun getGasPrices(): Pair<BigInteger, BigInteger> {
         val endpoint = "https://gasstation-mainnet.matic.network/v2"
         val url = URL(endpoint)
@@ -117,6 +145,78 @@ class WalletRepository(private val application: Application) : IWalletRepository
         }
     }
 
+    override fun fetchNfts(
+        walletAddress: String,
+        selectedNetwork: Network
+    ): List<NftValue> {
+        val envVars = EnvVars()
+        val currentTime = System.currentTimeMillis() / 1000
+        val sharedPreferences = getBalancesSharedPreferences(application)
+        val cacheExpirationTime = getNftCacheExpirationTime(sharedPreferences)
+        val cachedBalances = getUserNftBalances(application, selectedNetwork.displayName)
+
+
+        return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
+            cachedBalances
+        } else {
+            val url =
+                "https://api.covalenthq.com/v1/${Network.POLYGON_MAINNET.covalentChainName}/address/${walletAddress}/balances_nft/ "
+            val request = Request.Builder()
+                .url(url)
+                .header("accept", "application/json")
+                .header(
+                    "Authorization",
+                    "Basic " + "${envVars.covalentAPI}".toByteArray().encodeBase64()
+                )
+                .build()
+
+            val client = OkHttpClient()
+            val response: Response = client.newCall(request).execute()
+
+            val jsonResponse = response.body?.string()
+            val json = Json {
+                ignoreUnknownKeys = true
+                coerceInputValues = true
+            }
+
+
+            val covalentNftResponse =
+                jsonResponse?.let { json.decodeFromString<CovalentNftResponse>(it) }
+
+            val items = covalentNftResponse?.data?.items
+
+            val nft = items?.mapNotNull { item ->
+                Log.d("fetchBalances", "$item")
+
+                try {
+                    item.contract_address?.let {
+                        item.contract_name?.let { it1 ->
+                            item.nft_data[0].external_data?.image?.let { it2 ->
+                                NftValue(
+                                    it,
+                                    it1,
+                                    it2
+                                )
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("fetchNfts", "$e")
+                    Sentry.captureException(e)
+                }
+
+            }
+            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME_NFT", currentTime).apply()
+            cacheUserNftBalance(
+                nft as List<NftValue>,
+                application,
+                selectedNetwork.displayName
+            )
+            return nft as List<NftValue>
+        }
+    }
+
+
     override fun fetchBalances(
         chainName: String,
         walletAddress: String,
@@ -130,7 +230,6 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
         return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
             // Return the cached balances if they are still valid
-            Log.d("fetchBalances", "Returning cached balances")
             cachedBalances
         } else {
             val url =
@@ -220,7 +319,12 @@ class WalletRepository(private val application: Application) : IWalletRepository
         val ethEstimateGas = web3jService.ethEstimateGas(
             Transaction.createFunctionCallTransaction(
                 //TODO: Fix this line causing errors - testing using burn address here for now
-                "0x000000000000000000000000000000000000dEaD", nonce, gasPrice, null, "0x000000000000000000000000000000000000dEaD", encodedFunction
+                "0x000000000000000000000000000000000000dEaD",
+                nonce,
+                gasPrice,
+                null,
+                "0x000000000000000000000000000000000000dEaD",
+                encodedFunction
             )
         ).send()
 

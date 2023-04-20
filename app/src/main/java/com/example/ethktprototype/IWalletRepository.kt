@@ -26,4 +26,15 @@ interface IWalletRepository {
         toAddress: String,
         value: BigDecimal
     ): String
+
+    fun clearTokenBlocklist(): List<TokenBalance>
+
+    fun updateTokenBlockList(tokenBlocklist: List<TokenBalance>)
+
+    fun getTokenBlocklist(): List<TokenBalance>
+
+    fun fetchNfts(
+        walletAddress: String,
+        selectedNetwork: Network
+    ): List<NftValue>
 }

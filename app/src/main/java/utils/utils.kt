@@ -30,11 +30,18 @@ fun addressToEnsResolver(address: String): String {
 }
 
 
-fun buildScanUrl(network: Network, hash: String): String {
+fun buildTxScanUrl(network: Network, hash: String): String {
     if (network.chainId == Network.MUMBAI_TESTNET.chainId) {
         return "https://mumbai.polygonscan.com/tx/${hash}"
     }
     return "https://polygonscan.com/tx/${hash}"
+}
+
+fun buildContractScanUrl(network: Network, contractAddress: String): String {
+    if (network.chainId == Network.MUMBAI_TESTNET.chainId) {
+        return "https://mumbai.polygonscan.com/address/${contractAddress}"
+    }
+    return "https://polygonscan.com/address/${contractAddress}"
 }
 
 // Helper function to encode a byte array to a base64 string

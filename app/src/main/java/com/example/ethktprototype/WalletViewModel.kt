@@ -61,6 +61,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     var showPayDialog = MutableLiveData(false)
 
+    var showTokenDialog = MutableLiveData(false)
+
+    var tokenBlocklist = mutableStateOf<List<TokenBalance>>(emptyList())
+
     var userEnsName = MutableLiveData("")
 
 
@@ -90,6 +94,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         mnemonicLoaded.value = storedMnemonic != null
     }
 
+    fun updateTokenBlockList(token: TokenBalance) {
+        tokenBlocklist.value = tokenBlocklist.value.plus(token)
+        walletRepository.updateTokenBlockList(tokenBlocklist = tokenBlocklist.value)
+        getTokenBlocklist()
+    }
+
+    fun getTokenBlocklist(): List<TokenBalance> {
+        tokenBlocklist.value = walletRepository.getTokenBlocklist()
+        return walletRepository.getTokenBlocklist()
+    }
+
     fun getBalances(): MutableLiveData<List<TokenBalance>> {
         val tokens = MutableLiveData<List<TokenBalance>>()
         loading.value = true
@@ -111,9 +126,31 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return tokens
     }
 
+    fun getNftBalances(): MutableLiveData<List<NftValue>> {
+        val nfts = MutableLiveData<List<NftValue>>()
+        loading.value = true
+        val walletAddress = walletAddress.value
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val nftBalances = walletRepository.fetchNfts(
+                    walletAddress!!,
+                    selectedNetwork.value
+                )
+                nfts.postValue(nftBalances)
+            }
+            loading.value = false
+        }
+        return nfts
+    }
+
     fun removeAllWalletData() {
         walletRepository.removeAllWalletData()
         mnemonicLoaded.value = false
+    }
+
+    fun clearTokenBlocklist() {
+        tokenBlocklist.value = walletRepository.clearTokenBlocklist()
     }
 
     fun updateSelectedNetwork(network: Network) {
@@ -127,14 +164,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         sentCurrency.value = selectedToken.value?.symbol ?: ""
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO){
+            withContext(Dispatchers.IO) {
                 toAddress.value = ensResolver(address)
 
                 if (!mnemonic.isNullOrEmpty()) {
                     val credentials = loadBip44Credentials(mnemonic)
                     credentials.let {
                         sendTokens(
-                            credentials, contractAddress, toAddress.value, BigDecimal.valueOf(amount)
+                            credentials,
+                            contractAddress,
+                            toAddress.value,
+                            BigDecimal.valueOf(amount)
                         )
                         showPayDialog.postValue(false)
                     }
