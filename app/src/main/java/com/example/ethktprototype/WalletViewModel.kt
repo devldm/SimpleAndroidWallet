@@ -51,7 +51,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private var _mnemonicLoaded = mutableStateOf(false)
     var mnemonicLoaded: MutableState<Boolean> = _mnemonicLoaded
 
-    val loading = mutableStateOf(true)
+    val tokensLoading = mutableStateOf(false)
+
+    val nftsLoading = mutableStateOf(false)
 
     var toAddress = mutableStateOf("")
 
@@ -107,7 +109,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun getBalances(): MutableLiveData<List<TokenBalance>> {
         val tokens = MutableLiveData<List<TokenBalance>>()
-        loading.value = true
+        tokensLoading.value = true
         val walletAddress = walletAddress.value
 
         viewModelScope.launch {
@@ -121,14 +123,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 currentNetworkBalances.value = tokenBalances
                 selectedToken.value = currentNetworkBalances.value.firstOrNull()
             }
-            loading.value = false
+            tokensLoading.value = false
         }
         return tokens
     }
 
     fun getNftBalances(): MutableLiveData<List<NftValue>> {
         val nfts = MutableLiveData<List<NftValue>>()
-        loading.value = true
+        nftsLoading.value = true
         val walletAddress = walletAddress.value
 
         viewModelScope.launch {
@@ -139,7 +141,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 nfts.postValue(nftBalances)
             }
-            loading.value = false
+            nftsLoading.value = false
         }
         return nfts
     }

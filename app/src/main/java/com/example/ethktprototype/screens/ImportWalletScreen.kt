@@ -13,7 +13,7 @@ import com.example.ethktprototype.WalletViewModel
 import com.example.ethktprototype.composables.ImportWallet
 
 @Composable
-fun MyMainScreen(navController: NavHostController, viewModel: WalletViewModel) {
+fun ImportWalletScreen(navController: NavHostController, viewModel: WalletViewModel) {
     val mnemonicLoaded = viewModel.mnemonicLoaded.value
 
     Column(

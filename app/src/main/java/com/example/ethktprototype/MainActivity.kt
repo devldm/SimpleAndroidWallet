@@ -9,7 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.ethktprototype.screens.MyMainScreen
+import com.example.ethktprototype.screens.ImportWalletScreen
 import com.example.ethktprototype.screens.SettingsScreen
 import com.example.ethktprototype.screens.TokenListScreen
 import com.example.ethktprototype.ui.theme.EthKtPrototypeTheme
@@ -28,13 +28,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
             val isWalletMnemonicInPrefs = viewModel.mnemonicLoaded.value
-            val startPoint = if (!isWalletMnemonicInPrefs) "mainScreen" else "tokenList"
+            val startPoint = if (!isWalletMnemonicInPrefs) "importWallet" else "tokenList"
 
             EthKtPrototypeTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     NavHost(navController = navController, startDestination = startPoint) {
-                        composable("mainScreen") {
-                            MyMainScreen(
+                        composable("importWallet") {
+                            ImportWalletScreen(
                                 navController = navController,
                                 viewModel = viewModel
                             )

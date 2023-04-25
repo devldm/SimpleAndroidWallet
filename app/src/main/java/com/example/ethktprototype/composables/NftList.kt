@@ -28,7 +28,7 @@ import com.example.ethktprototype.WalletViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NftList(nfts: List<NftValue>, viewModel: WalletViewModel) {
-    if (!viewModel.loading.value && nfts.isEmpty()) {
+    if (!viewModel.nftsLoading.value && nfts.isEmpty()) {
         Column(
             Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -39,7 +39,7 @@ fun NftList(nfts: List<NftValue>, viewModel: WalletViewModel) {
     }
 
     LazyVerticalGrid(columns = GridCells.Fixed(2)) {
-        if (viewModel.loading.value) {
+        if (viewModel.nftsLoading.value) {
             item {
                 Loading()
             }
