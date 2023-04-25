@@ -45,6 +45,7 @@ fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
     var selectedToken by remember { mutableStateOf<TokenBalance?>(null) }
     var tokensBlocked = rememberUpdatedState(newValue = viewModel.getTokenBlocklist())
     val rememberedTokens = rememberUpdatedState(viewModel.currentNetworkBalances.value)
+    val isLoading = rememberUpdatedState(newValue = viewModel.tokensLoading.value)
 
     LaunchedEffect(viewModel.tokenBlocklist.value) {
         viewModel.tokenBlocklist.value = viewModel.getTokenBlocklist()
@@ -54,7 +55,7 @@ fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
         showTokenDialog = false
     }
 
-    if (!viewModel.loading.value && tokens.isEmpty()) {
+    if (!isLoading.value && tokens.isEmpty()) {
         Column(
             modifier = Modifier
                 .fillMaxSize(),
@@ -65,7 +66,7 @@ fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
         }
     }
 
-    if (viewModel.loading.value) {
+    if (isLoading.value) {
         Loading()
     }
 
