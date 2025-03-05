@@ -1,5 +1,7 @@
 package com.example.ethktprototype
 
+import com.example.ethktprototype.data.TokenBalance
+import com.example.ethktprototype.data.NftValue
 import org.web3j.crypto.Credentials
 import java.math.BigDecimal
 
@@ -12,11 +14,7 @@ interface IWalletRepository {
 
     fun removeAllWalletData()
 
-    fun fetchBalances(
-        chainName: String,
-        walletAddress: String,
-        selectedNetwork: Network
-    ): List<TokenBalance>
+    fun fetchBalances(addresses: String, first: Int): Pair<Double, List<TokenBalance>>
 
     fun getMnemonic(): String?
 

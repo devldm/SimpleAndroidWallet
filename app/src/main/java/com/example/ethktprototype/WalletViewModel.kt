@@ -2,20 +2,21 @@ package com.example.ethktprototype
 
 import android.app.Application
 import android.content.Context
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.example.ethktprototype.data.TokenBalance
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.web3j.crypto.Credentials
 import utils.addressToEnsResolver
 import utils.ensResolver
 import utils.loadBip44Credentials
 import java.math.BigDecimal
+
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
     private val walletRepository = WalletRepository(application)
@@ -23,187 +24,210 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         application.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
     private val walletAddressKey = "wallet_address"
 
-    private val _walletAddress = MutableLiveData<String>()
-    val walletAddress: LiveData<String>
-        get() = _walletAddress
-
-
-    private val _selectedNetwork = mutableStateOf(walletRepository.getLastSelectedNetwork())
-    val selectedNetwork: MutableState<Network> = _selectedNetwork
-
-    private val _currentNetworkBalances = mutableStateOf(
-        getUserBalances(
-            application, selectedNetwork = selectedNetwork.value.displayName
-        )
-    )
-    val currentNetworkBalances: MutableState<List<TokenBalance>> = _currentNetworkBalances
-
-    private val _selectedToken = mutableStateOf(currentNetworkBalances.value.firstOrNull())
-    val selectedToken: MutableState<TokenBalance?> = _selectedToken
-
-    var hash = MutableLiveData<String>()
-
-    fun updateSelectedToken(token: TokenBalance?) {
-        _selectedToken.value = token
-    }
-
-
-    private var _mnemonicLoaded = mutableStateOf(false)
-    var mnemonicLoaded: MutableState<Boolean> = _mnemonicLoaded
-
-    val tokensLoading = mutableStateOf(false)
-
-    val nftsLoading = mutableStateOf(false)
-
-    var toAddress = mutableStateOf("")
-
-    var sentAmount = mutableStateOf(0.0)
-
-    var sentCurrency = mutableStateOf("")
-
-    var showPayDialog = MutableLiveData(false)
-
-    var showTokenDialog = MutableLiveData(false)
-
-    var tokenBlocklist = mutableStateOf<List<TokenBalance>>(emptyList())
-
-    var userEnsName = MutableLiveData("")
-
+    private val _uiState = MutableStateFlow(WalletUiState())
+    val uiState: StateFlow<WalletUiState> = _uiState.asStateFlow()
 
     init {
-        // Load the wallet address from SharedPreferences when the ViewModel is created
-        _walletAddress.value = sharedPreferences.getString(walletAddressKey, "")
+        val savedWalletAddress = sharedPreferences.getString(walletAddressKey, "") ?: ""
+        updateUiState { it.copy(walletAddress = savedWalletAddress) }
+
+        val lastNetwork = walletRepository.getLastSelectedNetwork()
+        updateUiState { it.copy(selectedNetwork = lastNetwork) }
+
+        if (savedWalletAddress.isNotEmpty()) {
+            getBalances()
+            checkForEnsName(savedWalletAddress)
+        }
+
+        loadMnemonicFromPrefs()
+        getTokenBlocklist()
     }
 
-    fun getMnemonic(): String? {
-        val mnemonic = walletRepository.getMnemonic()
-        //mnemonicLoaded.value = true
-        return mnemonic
+    private fun updateUiState(update: (WalletUiState) -> WalletUiState) {
+        _uiState.update(update)
+    }
+
+    private fun getMnemonic(): String? {
+        return walletRepository.getMnemonic()
     }
 
     fun storeWallet(walletAddress: String) {
         walletRepository.storeWallet(walletAddress)
-        _walletAddress.value = walletAddress
+        updateUiState { it.copy(walletAddress = walletAddress) }
     }
 
     fun storeMnemonic(mnemonic: String) {
         walletRepository.storeMnemonic(mnemonic)
-        mnemonicLoaded.value = true
+        updateUiState { it.copy(mnemonicLoaded = true) }
     }
 
-    fun loadMnemonicFromPrefs() {
+    private fun loadMnemonicFromPrefs() {
         val storedMnemonic = walletRepository.loadMnemonicFromPrefs()
-        mnemonicLoaded.value = storedMnemonic != null
+        updateUiState { it.copy(mnemonicLoaded = storedMnemonic != null) }
     }
 
-    fun updateTokenBlockList(token: TokenBalance) {
-        tokenBlocklist.value = tokenBlocklist.value.plus(token)
-        walletRepository.updateTokenBlockList(tokenBlocklist = tokenBlocklist.value)
-        getTokenBlocklist()
+    fun updateTokenBlockList(token:TokenBalance) {
+        val updatedBlocklist = uiState.value.tokenBlocklist + token
+        walletRepository.updateTokenBlockList(tokenBlocklist = updatedBlocklist)
+        updateUiState { it.copy(tokenBlocklist = updatedBlocklist) }
     }
 
-    fun getTokenBlocklist(): List<TokenBalance> {
-        tokenBlocklist.value = walletRepository.getTokenBlocklist()
-        return walletRepository.getTokenBlocklist()
+    private fun getTokenBlocklist() {
+        val blockList = walletRepository.getTokenBlocklist()
+        updateUiState { it.copy(tokenBlocklist = blockList) }
     }
 
-    fun getBalances(): MutableLiveData<List<TokenBalance>> {
-        val tokens = MutableLiveData<List<TokenBalance>>()
-        tokensLoading.value = true
-        val walletAddress = walletAddress.value
+    fun getBalances() {
+        updateUiState { it.copy(isTokensLoading = true) }
+        val walletAddress = uiState.value.walletAddress
+
+        if (walletAddress.isEmpty()) return
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val tokenBalances = walletRepository.fetchBalances(
-                    selectedNetwork.value.covalentChainName,
-                    walletAddress!!,
-                    selectedNetwork.value
-                )
-                tokens.postValue(tokenBalances)
-                currentNetworkBalances.value = tokenBalances
-                selectedToken.value = currentNetworkBalances.value.firstOrNull()
+            try {
+                val (totalBalance, tokenBalances) = withContext(Dispatchers.IO) {
+                    walletRepository.fetchBalances(walletAddress, 101)
+                }
+
+                updateUiState {
+                    it.copy(
+                        totalBalanceUSD = totalBalance,
+                        tokens = tokenBalances,
+                        selectedToken = tokenBalances.firstOrNull(),
+                        isTokensLoading = false
+                    )
+                }
+            } catch (e: Exception) {
+                // Handle errors
+                updateUiState { it.copy(isTokensLoading = false) }
             }
-            tokensLoading.value = false
         }
-        return tokens
     }
 
-    fun getNftBalances(): MutableLiveData<List<NftValue>> {
-        val nfts = MutableLiveData<List<NftValue>>()
-        nftsLoading.value = true
-        val walletAddress = walletAddress.value
+    fun getNftBalances() {
+        updateUiState { it.copy(isNftsLoading = true) }
+        val walletAddress = uiState.value.walletAddress
+
+        if (walletAddress.isEmpty()) return
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val nftBalances = walletRepository.fetchNfts(
-                    walletAddress!!,
-                    selectedNetwork.value
-                )
-                nfts.postValue(nftBalances)
+            try {
+                val nftBalances = withContext(Dispatchers.IO) {
+                    walletRepository.fetchNfts(walletAddress, uiState.value.selectedNetwork)
+                }
+
+                updateUiState { it.copy(nfts = nftBalances, isNftsLoading = false) }
+            } catch (e: Exception) {
+                // Handle errors
+                updateUiState { it.copy(isNftsLoading = false) }
             }
-            nftsLoading.value = false
         }
-        return nfts
     }
 
     fun removeAllWalletData() {
         walletRepository.removeAllWalletData()
-        mnemonicLoaded.value = false
+        updateUiState {
+            WalletUiState() // Reset to default state
+        }
     }
 
     fun clearTokenBlocklist() {
-        tokenBlocklist.value = walletRepository.clearTokenBlocklist()
+        val emptyBlocklist = walletRepository.clearTokenBlocklist()
+        updateUiState { it.copy(tokenBlocklist = emptyBlocklist) }
     }
 
     fun updateSelectedNetwork(network: Network) {
-        val network = walletRepository.updateSelectedNetwork(network)
-        _selectedNetwork.value = network
+        val updatedNetwork = walletRepository.updateSelectedNetwork(network)
+        updateUiState { it.copy(selectedNetwork = updatedNetwork) }
+        // Refresh balances when network changes
+        getBalances()
+        getNftBalances()
+    }
+
+    fun updateSelectedToken(token: TokenBalance?) {
+        updateUiState { it.copy(selectedToken = token) }
+    }
+
+    fun setShowPayDialog(show: Boolean) {
+        updateUiState { it.copy(showPayDialog = show) }
+    }
+
+    fun setShowTokenBottomSheet(show: Boolean) {
+        updateUiState { it.copy(showTokenBottomSheet = show) }
+    }
+
+    fun setShowWalletModal(show: Boolean) {
+        updateUiState { it.copy(showWalletModal = show) }
+    }
+
+    fun setHashValue(value: String) {
+        updateUiState { it.copy(hash = value) }
+    }
+
+    fun setShowSuccessModal(show: Boolean) {
+        updateUiState { it.copy(showSuccessModal = show) }
     }
 
     fun onPayConfirmed(address: String, amount: Double, contractAddress: String) {
         val mnemonic = getMnemonic()
-        sentAmount.value = amount
-        sentCurrency.value = selectedToken.value?.symbol ?: ""
+
+        updateUiState {
+            it.copy(
+                sentAmount = amount,
+                sentCurrency = it.selectedToken?.symbol ?: ""
+            )
+        }
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                toAddress.value = ensResolver(address)
+            try {
+                val resolvedAddress = withContext(Dispatchers.IO) {
+                    ensResolver(address)
+                }
+
+                updateUiState { it.copy(toAddress = resolvedAddress) }
 
                 if (!mnemonic.isNullOrEmpty()) {
                     val credentials = loadBip44Credentials(mnemonic)
                     credentials.let {
-                        sendTokens(
-                            credentials,
-                            contractAddress,
-                            toAddress.value,
-                            BigDecimal.valueOf(amount)
-                        )
-                        showPayDialog.postValue(false)
+                        val hash = withContext(Dispatchers.IO) {
+                            walletRepository.sendTokens(
+                                credentials,
+                                contractAddress,
+                                resolvedAddress,
+                                BigDecimal.valueOf(amount)
+                            )
+                        }
+
+                        updateUiState { state ->
+                            state.copy(
+                                transactionHash = hash,
+                                showPayDialog = false,
+                                showSuccessModal = true
+                            )
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                // Handle errors
+                updateUiState { it.copy(showPayDialog = false) }
             }
         }
     }
 
-    fun checkForEnsName(walletAddress: String?) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                var ens = walletAddress?.let { addressToEnsResolver(it) }
-                userEnsName.postValue(ens)
-            }
-        }
-    }
+    private fun checkForEnsName(walletAddress: String?) {
+        if (walletAddress.isNullOrEmpty()) return
 
-    fun sendTokens(
-        credentials: Credentials, contractAddress: String, toAddress: String, value: BigDecimal
-    ) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val returnedHash = walletRepository.sendTokens(
-                    credentials, contractAddress, toAddress, value
-                )
-                hash.postValue(returnedHash)
+            try {
+                val ens = withContext(Dispatchers.IO) {
+                    addressToEnsResolver(walletAddress)
+                }
+
+                updateUiState { it.copy(userEnsName = ens) }
+            } catch (e: Exception) {
+                // Handle errors
             }
         }
     }
 }
+

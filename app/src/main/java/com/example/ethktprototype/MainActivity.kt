@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,15 +22,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize the view model
         viewModel = ViewModelProvider(this)[WalletViewModel::class.java]
-        viewModel.loadMnemonicFromPrefs()
 
         setContent {
             val navController = rememberNavController()
-            val isWalletMnemonicInPrefs = viewModel.mnemonicLoaded.value
-            val startPoint = if (!isWalletMnemonicInPrefs) "importWallet" else "tokenList"
+            val uiState by viewModel.uiState.collectAsState()
+            val startPoint = if (!uiState.mnemonicLoaded) "importWallet" else "tokenList"
 
             EthKtPrototypeTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {

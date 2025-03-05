@@ -13,7 +13,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 
 @Composable
 fun BarcodeScanner(
-    onScanResult: (String) -> Unit
+    onScanResult: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val scanLauncher = rememberLauncherForActivityResult(
@@ -37,7 +37,7 @@ fun BarcodeScanner(
             scanLauncher.launch(options)
         },
 
-    ) {
+        ) {
         Icon(
             painter = painterResource(id = R.drawable.baseline_qr_code_scanner_24),
             contentDescription = "Scan QR Code"

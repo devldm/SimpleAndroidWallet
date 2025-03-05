@@ -10,52 +10,41 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.ethktprototype.TokenBalance
+import com.example.ethktprototype.Network
+import com.example.ethktprototype.data.TokenBalance
 import com.example.ethktprototype.WalletViewModel
 import java.math.BigDecimal
 import java.text.DecimalFormat
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
+fun TokenList(
+    selectedNetwork: Network,
+    viewModel: WalletViewModel,
+    tokens: List<TokenBalance>,
+    tokenBlocklist: List<TokenBalance>,
+    isTokensLoading: Boolean,
+    showTokenBottomSheet: Boolean,
+    selectedToken: TokenBalance?,
+    onTokenSelected: (TokenBalance) -> Unit,
+) {
     val decimalFormatBalance = DecimalFormat("#.#######")
-    var showTokenDialog by remember { mutableStateOf(false) }
-    var selectedToken by remember { mutableStateOf<TokenBalance?>(null) }
-    var tokensBlocked = rememberUpdatedState(newValue = viewModel.getTokenBlocklist())
-    val rememberedTokens = rememberUpdatedState(viewModel.currentNetworkBalances.value)
-    val isLoading = rememberUpdatedState(newValue = viewModel.tokensLoading.value)
+    val decimalUsdFormatBalance = DecimalFormat("##.##")
 
-    LaunchedEffect(viewModel.tokenBlocklist.value) {
-        viewModel.tokenBlocklist.value = viewModel.getTokenBlocklist()
-    }
-
-    fun onHideClick() {
-        showTokenDialog = false
-    }
-
-    if (!isLoading.value && tokens.isEmpty()) {
+    if (!isTokensLoading && tokens.isEmpty()) {
         Column(
             modifier = Modifier
                 .fillMaxSize(),
@@ -66,29 +55,30 @@ fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
         }
     }
 
-    if (isLoading.value) {
+    if (isTokensLoading) {
         Loading()
     }
 
 
     LazyColumn(Modifier.fillMaxHeight(), userScrollEnabled = true) {
-        val nonBlockedTokens: List<TokenBalance> =
-            rememberedTokens.value.filter { token -> !tokensBlocked.value.contains(token) }
+        val nonBlockedTokens = tokens.filter { token -> !tokenBlocklist.contains(token) }
+
         items(nonBlockedTokens.size) { token ->
             val t = nonBlockedTokens[token]
 
-            if (showTokenDialog && selectedToken == t) {
-                TokenDialog(
+            if (showTokenBottomSheet && selectedToken == t) {
+                TokenBottomSheet(
                     token = t,
-                    network = viewModel.selectedNetwork.value,
+                    network = selectedNetwork,
                     viewModel = viewModel,
-                    onDismiss = { showTokenDialog = false; },
-                    setShowTokenDialog = { onHideClick() }
+                    onDismiss = { viewModel.setShowTokenBottomSheet(false) },
                 )
             }
 
             val balanceInEth = t.balance.toBigDecimal().divide(BigDecimal.TEN.pow(t.decimals))
             val formattedBalance = decimalFormatBalance.format(balanceInEth) ?: "N/A"
+            val formattedUsdBalance = decimalUsdFormatBalance.format(t.balanceUSD) ?: "N/A"
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -99,45 +89,40 @@ fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 2.dp)
-                        .clickable(onClick = { showTokenDialog = true; selectedToken = t })
+                        .clickable(onClick = {
+                            viewModel.setShowTokenBottomSheet(true); onTokenSelected(
+                            t
+                        )
+                        })
                 ) {
                     Row(
+
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .fillMaxWidth()
                     ) {
-                        Box(
-                            modifier = Modifier.size(50.dp),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            AsyncImage(
-                                model = t.tokenIcon,
-                                contentDescription = "Token Icon",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .size(45.dp)
-                                    .padding(start = 10.dp)
-
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 8.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)
-                        ) {
-
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            Box(
+                                modifier = Modifier.size(50.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    t.symbol,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                                    overflow = TextOverflow.Ellipsis,
-                                    maxLines = 1
+                                AsyncImage(
+                                    model = t.tokenIcon,
+                                    contentDescription = "Token Icon",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .size(45.dp)
+                                        .padding(start = 10.dp)
                                 )
+                            }
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Column {
                                 Text(
                                     text = t.name,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -145,17 +130,26 @@ fun TokenList(tokens: List<TokenBalance>, viewModel: WalletViewModel) {
                                     overflow = TextOverflow.Ellipsis,
                                     maxLines = 1
                                 )
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Balance: $formattedBalance",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
 
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = "$formattedBalance ${t.symbol}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "$${formattedUsdBalance}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(end = 10.dp)
+                        )
+                    }
                 }
+
             }
         }
 
