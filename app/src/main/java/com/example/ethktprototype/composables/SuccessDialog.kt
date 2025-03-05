@@ -1,11 +1,17 @@
 package com.example.ethktprototype.composables
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,7 +36,7 @@ fun SuccessDialogModal(
     sentCurrency: String,
     network: Network,
     hash: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
 
@@ -100,13 +106,13 @@ fun SuccessDialogModal(
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                if(hash.isNotEmpty()) {
+                if (hash.isNotEmpty()) {
                     TextButton(
                         onClick = { uriHandler.openUri(buildTxScanUrl(network, hash)) },
                         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                     ) {
                         Text("Polygonscan", Modifier.padding(horizontal = 5.dp))
-                        Icon(Icons.Filled.ExitToApp, "open external")
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "open external")
                     }
                 }
 

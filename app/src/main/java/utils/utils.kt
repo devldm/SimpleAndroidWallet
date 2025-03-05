@@ -44,10 +44,6 @@ fun buildContractScanUrl(network: Network, contractAddress: String): String {
     return "https://polygonscan.com/address/${contractAddress}"
 }
 
-// Helper function to encode a byte array to a base64 string
-fun ByteArray.encodeBase64(): String =
-    Base64.encodeToString(this, Base64.NO_WRAP)
-
 fun loadBip44Credentials(mnemonic: String): Credentials {
     val seed = MnemonicUtils.generateSeed(mnemonic, "")
     val masterKeypair = Bip32ECKeyPair.generateKeyPair(seed)

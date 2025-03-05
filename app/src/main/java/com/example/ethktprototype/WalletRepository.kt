@@ -9,16 +9,21 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import androidx.lifecycle.MutableLiveData
-import com.google.common.reflect.TypeToken
+import com.example.ethktprototype.data.GraphQLData
+import com.example.ethktprototype.data.GraphQLQueries
+import com.example.ethktprototype.data.GraphQLResponse
+import com.example.ethktprototype.data.NftValue
+import com.example.ethktprototype.data.PortfolioData
+import com.example.ethktprototype.data.TokenBalance
 import io.sentry.Sentry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
@@ -33,20 +38,28 @@ import org.web3j.tx.Transfer
 import org.web3j.tx.gas.DefaultGasProvider
 import org.web3j.utils.Convert
 import org.web3j.utils.Numeric
-import utils.encodeBase64
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.HttpURLConnection
 import java.net.URL
 
+object JsonUtils {
+    val json = Json {
+        ignoreUnknownKeys = true
+        prettyPrint = true
+        isLenient = true
+    }
+}
+
+
 class WalletRepository(private val application: Application) : IWalletRepository {
-    val context = application.applicationContext
+    private val context = application.applicationContext
     private val sharedPreferences =
         context.getSharedPreferences("WalletPrefs", Context.MODE_PRIVATE)
     private val walletAddressKey = "wallet_address"
     private val _selectedNetwork = mutableStateOf(Network.MUMBAI_TESTNET)
-    val selectedNetwork: MutableState<Network> = _selectedNetwork
-    val mnemonicLoaded = MutableLiveData<Boolean>()
+    private val selectedNetwork: MutableState<Network> = _selectedNetwork
+    private val mnemonicLoaded = MutableLiveData<Boolean>()
 
     override fun storeMnemonic(mnemonic: String) {
         encryptMnemonic(context, mnemonic)
@@ -111,7 +124,6 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
         return if (!json.isNullOrEmpty()) {
             try {
-                val type = object : TypeToken<List<TokenBalance>>() {}.type
                 val jsonReturn = Json.decodeFromString<List<TokenBalance>>(json)
                 jsonReturn
             } catch (e: Exception) {
@@ -123,7 +135,7 @@ class WalletRepository(private val application: Application) : IWalletRepository
 
     }
 
-    fun getGasPrices(): Pair<BigInteger, BigInteger> {
+    private fun getGasPrices(): Pair<BigInteger, BigInteger> {
         val endpoint = "https://gasstation-mainnet.matic.network/v2"
         val url = URL(endpoint)
         val connection = url.openConnection() as HttpURLConnection
@@ -155,133 +167,125 @@ class WalletRepository(private val application: Application) : IWalletRepository
         val cacheExpirationTime = getNftCacheExpirationTime(sharedPreferences)
         val cachedBalances = getUserNftBalances(application, selectedNetwork.displayName)
 
-
         return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
             cachedBalances
         } else {
-            val url =
-                "https://api.covalenthq.com/v1/${Network.POLYGON_MAINNET.covalentChainName}/address/${walletAddress}/balances_nft/ "
+            val client = OkHttpClient()
+
+            val requestBody = GraphQLQueries.getNftUsersTokensQuery(
+                owners = listOf(walletAddress),
+                network = selectedNetwork.name,
+                first = 10
+            )
+
             val request = Request.Builder()
-                .url(url)
-                .header("accept", "application/json")
-                .header(
-                    "Authorization",
-                    "Basic " + "${envVars.covalentAPI}".toByteArray().encodeBase64()
-                )
+                .url("https://public.zapper.xyz/graphql")
+                .header("x-zapper-api-key", envVars.zapperApiKey)
+                .post(requestBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 
-            val client = OkHttpClient()
-            val response: Response = client.newCall(request).execute()
+            return try {
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
 
-            val jsonResponse = response.body?.string()
-            val json = Json {
-                ignoreUnknownKeys = true
-                coerceInputValues = true
+                val jsonResponse = JsonUtils.json.decodeFromString<GraphQLResponse<GraphQLData>>(responseBody ?: "")
+                val nftNodes = jsonResponse.data?.nftUsersTokens?.edges
+
+                val nftList = nftNodes?.map { edge ->
+                    val node = edge.node
+                    val collection = node.collection
+                    val image = node.mediasV3?.images?.edges?.firstOrNull()?.node?.original
+
+                    NftValue(
+                        contractAddress = collection.address,
+                        contractName = collection.name ?: "Unknown",
+                        image = image ?: ""
+                    )
+                } ?: emptyList()
+
+                sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME_NFT", currentTime).apply()
+                cacheUserNftBalance(nftList, application, selectedNetwork.displayName)
+
+                nftList
+            } catch (e: Exception) {
+                Log.e("fetchNfts", "Error fetching NFT data", e)
+                emptyList()  // Return empty list in case of error
             }
-
-
-            val covalentNftResponse =
-                jsonResponse?.let { json.decodeFromString<CovalentNftResponse>(it) }
-
-            val items = covalentNftResponse?.data?.items
-
-            val nft = items?.mapNotNull { item ->
-                Log.d("fetchBalances", "$item")
-
-                try {
-                    item.contract_address?.let {
-                        item.contract_name?.let { it1 ->
-                            item.nft_data[0].external_data?.image?.let { it2 ->
-                                NftValue(
-                                    it,
-                                    it1,
-                                    it2
-                                )
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("fetchNfts", "$e")
-                    Sentry.captureException(e)
-                }
-
-            }
-            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME_NFT", currentTime).apply()
-            cacheUserNftBalance(
-                nft as List<NftValue>,
-                application,
-                selectedNetwork.displayName
-            )
-            return nft as List<NftValue>
         }
     }
 
 
     override fun fetchBalances(
-        chainName: String,
-        walletAddress: String,
-        selectedNetwork: Network
-    ): List<TokenBalance> {
+        addresses: String,
+        first: Int,
+    ): Pair<Double, List<TokenBalance>> {
         val currentTime = System.currentTimeMillis() / 1000
         val sharedPreferences = getBalancesSharedPreferences(application)
         val cacheExpirationTime = getCacheExpirationTime(sharedPreferences)
-        val cachedBalances = getUserBalances(application, selectedNetwork.displayName)
+        val cachedBalances = getUserBalances(application)
+        val cachedTotalBalance = getTotalBalanceUSD(application)
         val envVars = EnvVars()
 
-        return if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
-            // Return the cached balances if they are still valid
-            cachedBalances
-        } else {
-            val url =
-                "https://api.covalenthq.com/v1/${chainName}/address/${walletAddress}/balances_v2/"
-            val request = Request.Builder()
-                .url(url)
-                .header("accept", "application/json")
-                .header(
-                    "Authorization",
-                    "Basic " + "${envVars.covalentAPI}".toByteArray().encodeBase64()
+        if (cachedBalances.isNotEmpty() && cacheExpirationTime > currentTime) {
+            return Pair(cachedTotalBalance, cachedBalances)
+        }
+
+        val client = OkHttpClient()
+
+        val json = GraphQLQueries.getTokenBalancesQuery(
+            addresses = listOf(addresses),
+            first = 10
+        )
+        val requestBody = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = Request.Builder()
+            .url("https://public.zapper.xyz/graphql")
+            .header("x-zapper-api-key", envVars.zapperApiKey)
+            .post(requestBody)
+            .build()
+
+        return try {
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            val graphQLResponse = json.let {
+                JsonUtils.json.decodeFromString<GraphQLResponse<PortfolioData>>(
+                    responseBody!!
                 )
-                .build()
-
-            val client = OkHttpClient()
-            val response: Response = client.newCall(request).execute()
-
-            val json = response.body?.string()
-            val covalentResponse = json?.let { Json.decodeFromString<CovalentResponse>(it) }
-
-            val items = covalentResponse?.data?.items
-
-            val balances = items?.mapNotNull { item ->
-                Log.d("fetchBalances", "$item")
-
-                try {
-                    item.logo_url?.let {
-                        TokenBalance(
-                            item.contract_address,
-                            item.balance,
-                            item.contract_name,
-                            item.contract_ticker_symbol,
-                            item.contract_decimals,
-                            it
-
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.e("fetchBalances", "$e")
-                    Sentry.captureException(e)
-                }
-
             }
-            cacheUserBalance(
-                balances as List<TokenBalance>,
-                application,
-                selectedNetwork.displayName
-            )
-            // Update the cache expiration time
-            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime).apply()
-            return balances
+
+            if (graphQLResponse.data == null) {
+                Log.e("fetchBalances", "Error fetching balances: ${graphQLResponse.errors}")
+                return Pair(0.0, emptyList())
+            }
+
+            // Extract the totalBalanceUSD
+            val totalBalanceUSD = graphQLResponse.data.portfolioV2.tokenBalances.totalBalanceUSD
+
+            val balances = graphQLResponse.data.portfolioV2.tokenBalances.byToken.edges.map { edge ->
+                TokenBalance(
+                    contractAddress = edge.node.tokenAddress,
+                    balance = edge.node.balance.toString(),
+                    name = edge.node.name,
+                    symbol = edge.node.symbol,
+                    decimals = 18,
+                    tokenIcon = edge.node.imgUrlV2,
+                    balanceUSD = edge.node.balanceUSD,
+                    networkName = edge.node.network.name
+                )
+            }
+
+            cacheUserBalance(balances, application)
+            cacheTotalBalanceUSD(totalBalanceUSD, application)
+
+            sharedPreferences.edit().putLong("CACHE_EXPIRATION_TIME", currentTime + 3600).apply()
+
+            Pair(totalBalanceUSD, balances)
+        } catch (e: Exception) {
+            Log.e("fetchTokenBalances", "Error fetching balances", e)
+            Pair(cachedTotalBalance, cachedBalances)
         }
     }
+
 
     override suspend fun sendTokens(
         credentials: Credentials,
