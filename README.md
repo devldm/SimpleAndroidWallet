@@ -23,9 +23,9 @@ A lightweight, native Android wallet for Ethereum and Polygon networks, focused 
 
 ## 📱 Screenshots
 
-<img src="https://github.com/user-attachments/assets/77785d01-b9fc-4219-80c4-84d31f7f0867" alt="Wallet Home" width="300" height="650">
-<img src="https://github.com/user-attachments/assets/c3b0a0d6-479a-4649-a5bb-13d1afee3ff1" alt="Token Details" width="300" height="650">
-<img src="https://github.com/user-attachments/assets/1b0bc2ae-099a-4f27-870b-ce729d045747" alt="Send Transaction" width="300" height="650">
+<img src="https://github.com/user-attachments/assets/77785d01-b9fc-4219-80c4-84d31f7f0867" alt="Wallet Home" width="250" height="600">
+<img src="https://github.com/user-attachments/assets/c3b0a0d6-479a-4649-a5bb-13d1afee3ff1" alt="Token Details" width="250" height="600">
+<img src="https://github.com/user-attachments/assets/1b0bc2ae-099a-4f27-870b-ce729d045747" alt="Send Transaction" width="250" height="600">
 
 ## 🚀 Upcoming Features
 
