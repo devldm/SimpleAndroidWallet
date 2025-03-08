@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,9 +84,21 @@ fun TokenListScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp, 0.dp)
-                .wrapContentHeight()
+                .wrapContentHeight(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(Modifier.weight(1f))
+            Text(
+                text = uiState.ens.ifEmpty {
+                    uiState.walletAddress.take(5) + "..." + uiState.walletAddress.takeLast(
+                        4
+                    )
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                fontSize = 18.sp
+            )
+            Spacer(modifier = Modifier.weight(1f))
             IconButton(
                 modifier = Modifier.size(30.dp),
                 onClick = { navController.navigate("settingsScreen") }
@@ -113,7 +123,7 @@ fun TokenListScreen(
                 fontWeight = FontWeight.Bold,
                 fontSize = 50.sp
             )
-            Spacer(modifier = Modifier.height(16.dp))
+//            Spacer(modifier = Modifier.height(8.dp))
         }
 
         Row(
@@ -122,40 +132,6 @@ fun TokenListScreen(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = uiState.ens.ifEmpty {
-                        uiState.walletAddress.take(5) + "..." + uiState.walletAddress.takeLast(
-                            4
-                        )
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
-                )
-                if (uiState.ens.isNotEmpty()) {
-                    Text(
-                        text = uiState.walletAddress.take(5) + "..." + uiState.walletAddress.takeLast(
-                            4
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
-                }
-            }
-            IconButton(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(uiState.walletAddress))
-                }
-            ) {
-                Icon(
-                    Icons.Filled.ContentCopy,
-                    contentDescription = "Copy wallet address",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
